@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<!--
+/* 
+    Author     : Islam Akef Ebeid
+*/
+-->
+<html>
+    <head>
+        <title>TODO supply a title</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <script src="js/jquery.min.js"></script>
+        <script src="js/d3.v3.min.js"></script>
+        <script src="js/taffy.js"></script>
+        <script src="js/orange.js"></script>
+        <style>@import url(apple.css);</style>
+    </head>
+    <body>
+        <header>
+            <div class="module"><h1>XLPM Map Viewer</h1></div>
+        </header>
+        <nav>
+            <div class="module">
+                <fieldset>
+                <legend>Visualization</legend>
+                <p>Please choose fasta file to parse</p>
+                <input type="file" id="fastafile"/><br/>
+                <p>Please choose data file to parse</p>
+                <input type="file" id="datafile"/><br/><br/>
+                <button id="mainButton" type="button" onclick="main(fastaText, dataText)">Visualize</button><br/><br/>
+                <button type="button" onclick="clearSVG()">Clear</button><br/><br/>
+                </fieldset>
+            </div>
+        </nav>
+        <section>
+        </section>
+        <footer>
+            Copyright © UALR.EDU
+        </footer>
+    </body>
+</html>

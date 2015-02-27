@@ -1,0 +1,43 @@
+/* 
+    Author     : Islam Akef Ebeid
+*/
+body {
+    font-family: "Helvetica Neue", Helvetica, sans-serif;
+}
+header {
+    text-align:center;
+    padding:5px; 
+}
+h1 {
+    font-size: 64px;
+    font-weight: 300;
+    letter-spacing: -2px;
+    margin: .3em 0 .1em 0;
+}
+nav {
+    height:100%;
+    width:20%;
+    float:left;
+    padding:5px; 
+}
+section {
+    width:70%;
+    float:left;
+    padding-top: 10px;
+    padding-right: 10px;
+    padding-bottom: 10px;
+    padding-left: 10px;
+}
+footer {
+    clear:both;
+    text-align:center;
+    padding:5px; 
+    font-size: small;
+    margin-top: 8em;
+}
+.module {
+    border: 0.5em solid #ccc;
+    background: #eee;
+    padding: 1.5em;
+    margin: 0 0 2em 0;
+}
