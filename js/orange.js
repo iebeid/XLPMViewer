@@ -4,69 +4,122 @@
  * 
  */
 
-                var fastaText = "";
-                var dataText = "";
-                window.onload = function () {
-                    var fastafileInput = document.getElementById('fastafile');
-                    fastafileInput.addEventListener('change', function (e) {
-                        var file = fastafileInput.files[0];
-                        var textType = /fasta.*/;
-                        if (file.name.match(textType)) {
-                            var reader = new FileReader();
-                            reader.onload = function (e) {
-                                fastaText = reader.result;
-                            }
-                            reader.readAsText(file);
-                        } else {
-                            alert("File not supported!");
-                        }
-                    });
-                    var datafileInput = document.getElementById('datafile');
-                    datafileInput.addEventListener('change', function (e) {
-                        var file = datafileInput.files[0];
-                        var textType = /txt.*/;
-                        if (file.name.match(textType)) {
-                            var reader = new FileReader();
-                            reader.onload = function (e) {
-                                dataText = reader.result;
-                            }
-                            reader.readAsText(file);
-                        } else {
-                            alert("File not supported!");
-                        }
-                    });
-                }
+var fastaText = "";
+var dataText = "";
+window.onload = function () {
+    d3.select("#vis").style("visibility", "hidden");
+    var fastafileInput = document.getElementById('fastafile');
+    fastafileInput.addEventListener('change', function (e) {
+        var file = fastafileInput.files[0];
+        var textType = /fasta.*/;
+        if (file.name.match(textType)) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                fastaText = reader.result;
+            };
+            reader.readAsText(file);
+        } else {
+            alert("File not supported!");
+        }
+    });
+    var datafileInput = document.getElementById('datafile');
+    datafileInput.addEventListener('change', function (e) {
+        var file = datafileInput.files[0];
+        var textType = /txt.*/;
+        if (file.name.match(textType)) {
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                dataText = reader.result;
+            };
+            reader.readAsText(file);
+        } else {
+            alert("File not supported!");
+        }
+    });
+};
 
 function main(fastaFile, dataFile) {
+    d3.select("#vis").style("visibility", "visible");
     var sequence_table = createSequenceTable(fastaFile);
     var sequences = TAFFY(sequence_table);
-    var sequenceVar = sequences().select("id");
     var block_table = createBlockTable(dataFile);
     var blocks = TAFFY(block_table.blocks);
     var precursorinfo = TAFFY(block_table.precursorinfo);
-    var svg = init();
-    var resultArray = displaySequenceTable(sequence_table,svg);
+    init();
+    var resultArray = displaySequenceTable(sequence_table);
     var points = createPointsTable(sequences, blocks);
-    var drawnPoints = createDataPointsOnMatrix(resultArray.cellHeigts, resultArray.cellWidths, points.filteredPointsTable, svg, points.points_table,blocks,precursorinfo,"blue");
-    $("#mainButton").attr("disabled","true");
+    var drawnPoints = createDataPointsOnMatrix(resultArray.cellHeigts, resultArray.cellWidths, points.filteredPointsTable, points.points_table, blocks, precursorinfo, "#000099", resultArray.rectHeight, resultArray.rectWidth);
+    d3.select("#mainButton").attr("disabled", "true");
+}
+margin = 0;
+function init() {
+    margin = {top: 100, right: 135, bottom: 10, left: window.innerWidth / 5};
+    var width = document.getElementById("vis").clientWidth;
+    var height = document.getElementById("vis").clientWidth;
+    var viewBoxValue = "0 0 " + width + " " + height;
+    var svg = d3.select("#vis").append("svg").attr("width", width)
+            .attr("height", height)
+            .attr("viewBox", viewBoxValue).attr("preserveAspectRatio", "xMinYMin meet").attr("id", "mainSVG")
+            .style("font-family", "Helvetica").style("font-size", "10px").append("g").attr("id", "mainGroup");
+    var legendGroup = svg.append("g").attr("id", "legendGroup").attr("transform", "translate(0,0)");
+    var scaleGroup = svg.append("g").attr("id", "scaleGroup").attr("transform", "translate(50,25)");
+    var visGroup = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    var firstLayerGroup = visGroup.append("g").attr("id", "first");
+    var secondLayerGroup = visGroup.append("g").attr("id", "second");
+    var thirdLayerGroup = visGroup.append("g").attr("id", "third");
+    createSlider();
 }
 
-function init(){
-        var margin = {top: 80, right: 0, bottom: 10, left: 80};
-    var width = 2048;
-    var height = 2048;
+function clearSVG() {
+    window.location.reload();
+}
 
-    var svg = d3.select("section").append("svg")
-            .attr("width", width + margin.left + margin.right)
-            .attr("height", height + margin.top + margin.bottom)
-            .style("margin-left", -margin.left + "px").style("font","10px 'Helvetica Neue'")
-            .call( d3.behavior.zoom().scaleExtent([-2, 10]).on("zoom", function () {
-                svg.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
-            }))
-            .append("g")
-            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
-    
-    return {svg: svg, width: width, height: height};
+function createSlider() {
+    var height = 20;
+    var width = d3.select("svg").attr("width") - margin.right;
+    var x = d3.scale.linear()
+            .domain([0.1, 1.5]).range([0, width]).clamp(true);
+    var brush = d3.svg.brush()
+            .x(x)
+            .extent([0, 0])
+            .on("brush", brushed);
+    var svg = d3.select("#scaleGroup");
+    svg.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + height / 2 + ")")
+            .call(d3.svg.axis()
+                    .scale(x)
+                    .orient("bottom")
+                    .tickSize(1)
+                    .tickPadding(10).tickValues([0, 100]));
+    var slider = svg.append("g")
+            .attr("class", "slider")
+            .call(brush);
+    slider.selectAll(".extent,.resize")
+            .remove();
+    slider.select(".background")
+            .attr("height", height);
+    var handle = slider.append("circle")
+            .attr("class", "handle")
+            .attr("transform", "translate(0," + height / 2 + ")")
+            .attr("r", 5);
+    slider
+            .call(brush.event)
+            .transition()
+            .duration(750)
+            .call(brush.extent([70, 70]))
+            .call(brush.event);
+
+    function brushed() {
+        var value = 1;
+        if (d3.event.sourceEvent) {
+            value = x.invert(d3.mouse(this)[0]);
+            brush.extent([value, value]);
+        }
+        handle.attr("cx", x(value));
+        d3.select("#first").attr("transform", "scale(" + value + ")");
+        d3.select("#second").attr("transform", "scale(" + value + ")");
+    }
 }
 
 function createSequenceTable(fastaFile) {
@@ -89,23 +142,18 @@ function createSequenceTable(fastaFile) {
             secondSeq = secondSeq + line;
         }
     }
-
     var splitseq1 = firstSeq.match(/([^KR])*[KR]?/g);
     splitseq1.pop();
-
     for (var i = 0; i < splitseq1.length; i++) {
         sequence_table.push({id: counterRelay, uniqueNumber: i, sequence: splitseq1[i].toString().toUpperCase(), type: 1});
         counterRelay++;
     }
-
     var splitseq2 = secondSeq.match(/([^KR])*[KR]?/g);
     splitseq2.pop();
-
     for (var j = 0; j < splitseq2.length; j++) {
         sequence_table.push({id: counterRelay, uniqueNumber: j, sequence: splitseq2[j].toString().toUpperCase(), type: 2});
         counterRelay++;
     }
-
     return sequence_table;
 }
 
@@ -114,19 +162,20 @@ function createBlockTable(dataFile) {
     var precursorinfo = [];
     var lines = dataFile.split('\n');
     var reactionCounter = 0;
-
     for (var j = 2; j < lines.length; j++) {
         var line = lines[j];
-        if (isNaN(line[0])) {
-            var splitseq = line.match(/[\S]+/g);
-            blocks.push({id: reactionCounter, title: splitseq[0], mz: splitseq[1], fragment1: splitseq[2], fragment2: splitseq[3], tmass: splitseq[4], 
-                amass: splitseq[5], charge: splitseq[6], score: splitseq[7]});
-            reactionCounter++;
-        }
-        else{
-            var info = reactionCounter + "  " + line;
-            var splitinfo = info.match(/[\S]+/g);
-            precursorinfo.push({blockId: splitinfo[0], frag1: splitinfo[1], frag2: splitinfo[2], score: splitinfo[3]});
+        if (line.length > 0) {
+            if (isNaN(line[0])) {
+                var splitseq = line.match(/[\S]+/g);
+                blocks.push({id: reactionCounter, title: splitseq[0], mz: splitseq[1], fragment1: splitseq[2], fragment2: splitseq[3], tmass: splitseq[4],
+                    amass: splitseq[5], charge: splitseq[6], score: splitseq[7]});
+                reactionCounter++;
+            }
+            else {
+                var info = reactionCounter + "  " + line;
+                var splitinfo = info.match(/[\S]+/g);
+                precursorinfo.push({blockId: splitinfo[0], frag1: splitinfo[1], frag2: splitinfo[2], score: splitinfo[3]});
+            }
         }
     }
     return {blocks: blocks, precursorinfo: precursorinfo};
@@ -136,27 +185,26 @@ function createPointsTable(sequences, blocks) {
     var points = [];
     var filteredPoints = [];
     var pointsID = 0;
-
     function getUniqueNumbers(fragment, type, sequence) {
         var uniqueNumbers = [];
-        var correctedUniqueNumber;
+        var correctedUniqueNumber = 0;
         var correctedUniqueNumberTemp;
         var dividedFrag = fragment.toString().toUpperCase().match(/([^KR])*[KR]?/g);
         dividedFrag.pop();
         var result = sequences({sequence: dividedFrag[0], type: type}).get();
-        dividedFrag.forEach(function (seq, i) {
-            var calcNumber = (result[0].uniqueNumber) + i;
-            uniqueNumbers.push({calcNumber: calcNumber, sequence: seq});
-        });
-        var uniqueNumbersTable = TAFFY(uniqueNumbers);
-        correctedUniqueNumberTemp = uniqueNumbersTable({sequence: sequence}).get();
-        correctedUniqueNumber = correctedUniqueNumberTemp[0].calcNumber;
+        if (result.length > 0) {
+            dividedFrag.forEach(function (seq, i) {
+                var calcNumber = (result[0].uniqueNumber) + i;
+                uniqueNumbers.push({calcNumber: calcNumber, sequence: seq});
+            });
+            var uniqueNumbersTable = TAFFY(uniqueNumbers);
+            correctedUniqueNumberTemp = uniqueNumbersTable({sequence: sequence}).get();
+            correctedUniqueNumber = correctedUniqueNumberTemp[0].calcNumber;
+        }
         return correctedUniqueNumber;
     }
-
     var result = blocks().get();
     result.forEach(function (r) {
-
         var seqs1 = r.fragment1;
         var splitseq1 = seqs1.toString().toUpperCase().match(/([^KR])*[KR]?/g);
         splitseq1.pop();
@@ -165,17 +213,16 @@ function createPointsTable(sequences, blocks) {
         splitseq2.pop();
         splitseq1.forEach(function (s1) {
             splitseq2.forEach(function (s2) {
-                var sourceNumber = getUniqueNumbers(seqs1, 1, s1);
-                var targetNumber = getUniqueNumbers(seqs2, 2, s2);
-                points.push({id: pointsID,blockId: r.id ,sequence1: s1, sequence2: s2, score: r.score, sourceNumber: sourceNumber, targetNumber: targetNumber, title: r.title, mz: r.mz, tmass: r.tmass,
+                var sourceNumber = getUniqueNumbers(seqs1.toString().toUpperCase(), 1, s1);
+
+                var targetNumber = getUniqueNumbers(seqs2.toString().toUpperCase(), 2, s2);
+                points.push({id: pointsID, blockId: r.id, sequence1: s1, sequence2: s2, score: r.score, sourceNumber: sourceNumber, targetNumber: targetNumber, title: r.title, mz: r.mz, tmass: r.tmass,
                     amass: r.amass, charge: r.charge});
                 pointsID++;
             });
         });
     });
-
     var points_table = TAFFY(points);
-
     var query2 = points_table().distinct("sequence1", "sequence2");
     query2.forEach(function (element) {
         var elements = points_table({sequence1: element[0], sequence2: element[1]}).get();
@@ -193,7 +240,7 @@ function createPointsTable(sequences, blocks) {
     return {filteredPointsTable: filteredPointsTable, points_table: points_table};
 }
 
-function displaySequenceTable(sequence_table,svg) {
+function displaySequenceTable(sequence_table) {
     var rowCount = 0;
     var columnCount = 0;
     var seqOneCount = 0;
@@ -218,9 +265,6 @@ function displaySequenceTable(sequence_table,svg) {
     anotherTemp[0] = 3;
     var cellWidths = [];
     var computedLengthsArrayColumn = [];
-
-
- 
     sequence_table.forEach(function (node) {
         if (node.type === 1) {
             columnCount = columnCount + node.sequence.length;
@@ -234,12 +278,11 @@ function displaySequenceTable(sequence_table,svg) {
             yCount++;
         }
     });
-    var rect = svg.svg.append("rect")
+    var rect = d3.select("#first").append("rect")
             .attr("class", "background")
-            .attr("width", svg.width)
-            .attr("height", svg.height).attr("fill","#A9A9A9");
-
-    var row = svg.svg.selectAll(".row")
+            .attr("width", d3.select("svg").attr("width"))
+            .attr("height", d3.select("svg").attr("height")).attr("fill", "#A9A9A9");
+    var row = d3.select("#first").selectAll(".row")
             .data(rowHeaders)
             .enter().append("g")
             .attr("class", "row");
@@ -257,16 +300,7 @@ function displaySequenceTable(sequence_table,svg) {
         var h = lengthValueText;
         return "translate(0," + h + ")rotate(90)";
     });
-    row.append("line").attr("stroke","#fff")
-            .attr("x2", svg.width).attr("transform", function (d, i) {
-        lengthValue = lengthValue + temp[i];
-        temp[i + 1] = computedLengthsArray[i];
-        var h = lengthValue;
-        cellHeigts[i] = h;
-        return "translate(0," + h + ")";
-    });
-
-    var column = svg.svg.selectAll(".column")
+    var column = d3.select("#first").selectAll(".column")
             .data(columnHeaders)
             .enter().append("g")
             .attr("class", "column");
@@ -284,37 +318,44 @@ function displaySequenceTable(sequence_table,svg) {
         var w = widthValueText;
         return "translate(" + w + ",-20)";
     });
-    column.append("line").attr("stroke","#fff")
-            .attr("x1", -svg.height).attr("transform", function (d, i) {
-        widthValue = widthValue + anotherTemp[i];
-        anotherTemp[i + 1] = computedLengthsArrayColumn[i];
-        var w = widthValue;
-        cellWidths[i] = w;
-        return "translate(" + w + ")rotate(-90)";
-    });
-
     var newWidth;
-    var newHeight;
     var totalWidth = 0;
-    var totalHeight = 0;
-    computedLengthsArray.forEach(function (l) {
-        totalHeight += l;
-    });
     computedLengthsArrayColumn.forEach(function (w) {
         totalWidth += w;
     });
     newWidth = totalWidth;
+    var newHeight;
+    var totalHeight = 0;
+    computedLengthsArray.forEach(function (l) {
+        totalHeight += l;
+    });
     newHeight = totalHeight;
+    row.append("line").attr("stroke", "#fff")
+            .attr("x2", newWidth).attr("transform", function (d, i) {
+        lengthValue = lengthValue + temp[i];
+        temp[i + 1] = computedLengthsArray[i];
+        var h = lengthValue;
+        cellHeigts.push(h);
+        return "translate(0," + h + ")";
+    });
+    column.append("line").attr("stroke", "#fff")
+            .attr("x1", -newHeight).attr("transform", function (d, i) {
+        widthValue = widthValue + anotherTemp[i];
+        anotherTemp[i + 1] = computedLengthsArrayColumn[i];
+        var w = widthValue;
+        cellWidths.push(w);
+        return "translate(" + w + ")rotate(-90)";
+    });
     rect.attr("width", newWidth).attr("height", newHeight);
-    console.log(cellHeigts);
-    console.log(cellWidths);
     return {
         cellHeigts: cellHeigts,
-        cellWidths: cellWidths
+        cellWidths: cellWidths,
+        rectHeight: newHeight,
+        rectWidth: newWidth
     };
 }
 
-function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, svg,points_table,blocks,precursorinfo, color) {
+function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, points_table, blocks, precursorinfo, color, newHeight, newWidth) {
     var matrix = [];
     var rowCellHeigtsTemp = [];
     rowCellHeigtsTemp[0] = 0;
@@ -324,7 +365,6 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, svg
     rowColumnWidthsTemp[0] = 0;
     var rowColumnWidths = [];
     rowColumnWidths[0] = 0;
-
     for (var i = 0; i < cellHeigts.length; i++) {
         matrix[i] = d3.range(cellWidths.length).map(function (j) {
             return {x: i, y: j, w: 0, h: 0, positionX: 0, positionY: 0, title: '', mz: 0, tmass: 0,
@@ -332,9 +372,7 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, svg
         });
     }
     var points = pointsTaffyObject().get();
-    
     points.forEach(function (point) {
-        console.log(point);
         matrix[point.source][point.target].title = point.title;
         matrix[point.source][point.target].mz = point.mz;
         matrix[point.source][point.target].tmass = point.tmass;
@@ -345,9 +383,7 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, svg
         matrix[point.source][point.target].source = point.source;
         matrix[point.source][point.target].target = point.target;
         matrix[point.source][point.target].value = point.value;
-
     });
-
     cellHeigts.forEach(function (height, i) {
         var temp = rowCellHeigtsTemp[i] - height;
         i += 1;
@@ -367,7 +403,6 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, svg
     rowCellHeigtsTemp.shift();
     rowColumnWidthsTemp.shift();
     var existingData = [];
-
     matrix.forEach(function (d, i) {
         d.forEach(function (cell, j) {
             if (cell.value !== 0) {
@@ -375,285 +410,525 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, svg
                 cell.h = rowCellHeigts[cell.y];
                 cell.positionX = rowColumnWidthsTemp[cell.x];
                 cell.positionY = rowCellHeigtsTemp[cell.y];
-                existingData[i] = cell;
+                existingData.push(cell);
             }
         });
     });
     var fillOpacities = [];
-    var colorSelected = {color: '',opacity: 0};
-    var z = d3.scale.linear().domain([0.1, 1.4]).clamp(true);
-    existingData.forEach(function (d) {
-        var cell = svg.svg.append("rect")
+    var colorSelected = {color: '', opacity: 0};
+    var blockArraySorted = existingData.sort(function (a, b) {
+        return a.value - b.value;
+    });
+    var minScore = blockArraySorted[0].value;
+    var maxScore = blockArraySorted[blockArraySorted.length - 1].value;
+    var z = d3.scale.linear().domain([minScore, maxScore]).range([0.1, 1]);
+    existingData.forEach(function (d, i) {
+        var cell = d3.select("#first").append("rect")
                 .attr("x", d.positionX)
                 .attr("y", d.positionY)
                 .attr("width", d.w - 1)
-                .attr("height", d.h - 1).style("fill", color).style("fill-opacity", function(){
-                            var opacityValue = z(d.value);
-                    colorSelected.opacity = opacityValue;
-                            fillOpacities.push(opacityValue);
-                            return opacityValue;})
-    .on("click", function () {
-            colorSelected.color = color;
-
-           // svg.remove();
-          // $("svg").empty();
-            createTreemap(points_table, d.sequence1, d.sequence2,blocks,precursorinfo,colorSelected,svg);
+                .attr("height", d.h - 1).style("fill", color).style("fill-opacity", function () {
+            var opacityValue = z(d.value);
+            colorSelected.opacity = opacityValue;
+            fillOpacities.push({opacityValue: opacityValue, value: d.value});
+            return opacityValue;
         })
+                .on("click", function () {
+                    colorSelected.color = color;
+                    d3.select("#first").style("visibility", "hidden");
+                    createTreemap(points_table, d.sequence1, d.sequence2, blocks, precursorinfo, colorSelected);
+                })
                 .append("title")
                 .text("Sequence 1: " + d.sequence1 + "\nSequence 2: " + d.sequence2 + "\nScore: " + d.value);
     });
-    fillOpacities.sort();
-
-    /*
-d3.select("svg").selectAll("rect")
-    .data(fillOpacities)
-    .enter().append("rect")
-    .style("stroke", "gray")
-    .style("fill", "black")
-    .attr("height", 40)
-    .attr("width", 75);
-    */
-   svg.svg.append("g").selectAll(".legend").data(fillOpacities)
-    .enter().append("rect").attr("class", "legend")
-    .style("stroke", "grey")
-    .style("fill", color)
-    .style("fill-opacity", function(d){return d;})
-    .attr("height", 40)
-    .attr("width", 75)
-    .attr("x", function(d,i){return i * 80;});
-   
-    
+    function compare(a, b) {
+        if (a.value < b.value)
+            return -1;
+        if (a.value > b.value)
+            return 1;
+        return 0;
+    }
+    fillOpacities.sort(compare);
+    var flags = [], fillOpacitiesDistinctArray = [], l = fillOpacities.length, i;
+    for (i = 0; i < l; i++) {
+        if (flags[fillOpacities[i].value])
+            continue;
+        flags[fillOpacities[i].value] = true;
+        fillOpacitiesDistinctArray.push(fillOpacities[i]);
+    }
+    createColorLegend(fillOpacitiesDistinctArray);
     return existingData;
 }
 
-function createTreemap(points, sequence1, sequence2, blocks,precursorinfo,colorSelected,svg) {
+function createColorLegend(data) {
+    var x1 = 50,
+            barWidth = d3.select("svg").attr("width") - margin.right,
+            y1 = 10,
+            barHeight = 20,
+            numberHues = data.length;
+    var idGradient = "legendGradient";
+    var svgForLegendStuff = d3.select("#legendGroup");
+    svgForLegendStuff.append("g").attr("id", "firstLegendGroup").append("defs")
+            .append("linearGradient")
+            .attr("id", idGradient)
+            .attr("x1", "0%")
+            .attr("x2", "100%")
+            .attr("y1", "0%")
+            .attr("y2", "0%");
+    svgForLegendStuff.append("rect")
+            .attr("fill", "url(#" + idGradient + ")")
+            .attr("x", x1)
+            .attr("y", y1)
+            .attr("width", barWidth)
+            .attr("height", barHeight);
+    var textY = y1 + barHeight / 2 + 5;
+    svgForLegendStuff.selectAll(".leftLegend")
+            .data(data)
+            .enter().append("g")
+            .attr("class", "leftLegend").append("text")
+            .attr("text-anchor", "middle")
+            .attr("x", x1 - 20)
+            .attr("y", textY).attr("font-size", "15px")
+            .attr("dy", 0)
+            .text(function (d, i) {
+                if (i === 0) {
+                    return d.value.toFixed(2);
+                }
+                return " ";
+            });
+    svgForLegendStuff.selectAll(".rightLegend")
+            .data(data)
+            .enter().append("g")
+            .attr("class", "rightLegend").append("text")
+            .attr("text-anchor", "left")
+            .attr("x", x1 + barWidth + 10)
+            .attr("y", textY)
+            .attr("font-size", "15px")
+            .attr("dy", 0)
+            .text(function (d, i) {
+                if (i === (data.length - 1)) {
+                    return d.value.toFixed(2);
+                }
+                return " ";
+            });
+    var hueStart = 160, hueEnd = 0;
+    var opacityStart = data[0].opacityValue, opacityEnd = data[data.length - 1].opacityValue;
+    var theHue, rgbString, opacity, p;
+    var deltaPercent = 1 / (numberHues - 1);
+    var deltaHue = (hueEnd - hueStart) / (numberHues - 1);
+    var deltaOpacity = (opacityEnd - opacityStart) / (numberHues - 1);
+    var theData = [];
+    for (var i = 0; i < numberHues; i++) {
+        theHue = hueStart + deltaHue * i;
+        rgbString = "#000099";
+        opacity = opacityStart + deltaOpacity * i;
+        p = 0 + deltaPercent * i;
+        theData.push({"rgb": rgbString, "opacity": opacity, "percent": p});
+    }
+    var stops = d3.select('#' + idGradient).selectAll('stop')
+            .data(theData);
+    stops.enter().append('stop');
+    stops.attr('offset', function (d) {
+        return d.percent;
+    })
+            .attr('stop-color', function (d) {
+                return d.rgb;
+            })
+            .attr('stop-opacity', function (d) {
+                return d.opacity;
+            });
+}
+
+function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colorSelected) {
     var results = points({sequence1: sequence1, sequence2: sequence2}).get();
     var children = [];
     var root = {name: sequence1 + " " + sequence2, children: []};
     results.forEach(function (result) {
         root.children.push({name: "possibility", blockId: result.blockId, size: result.score, amass: result.amass, charge: result.charge, mz: result.mz, sequence1: result.sequence1, sequence2: result.sequence2, title: result.title, tmass: result.tmass});
     });
-    
-    var margin = {top: 40, right: 10, bottom: 10, left: 10},
-    width = 800 - margin.left - margin.right,
-            height = 600 - margin.top - margin.bottom;
-    
-////////////////////////////////////////////////////////////////////
-
-     var treemap = d3.layout.treemap()
-            .size([width, height])
-            .sticky(true)
-            .value(function (d) {
-                return d.size;
+    var width = 960;
+    var height = 600;
+    var x = d3.scale.linear().domain([0.3, 1.35]).range([1, 100]).clamp(true);
+    var treemap = d3.layout.treemap().size([width, height]).round(true).sticky(true).sort(function (a, b) {
+        return a.size - b.size;
+    }).value(function (d) {
+        return x(d.size);
+    });
+    var treeMapGroup = d3.select("#second");
+    var sequenceGroup = treeMapGroup.append("g").append("text").text(function (d) {
+        return sequence1 + " " + sequence2;
+    }).attr("transform", function () {
+        var textPositionX = (width / 2) - this.getComputedTextLength();
+        return "translate(" + textPositionX + ",-10)";
+    }).attr("font-size", "20px");
+    var cell = treeMapGroup.datum(root).selectAll(".leaf").data(treemap.nodes(root))
+            .enter().append("g")
+            .attr("class", "leaf")
+            .attr("transform", function (d) {
+                return "translate(" + d.x + "," + d.y + ")";
             });
-
-             
-                  /*        
-  
-     d3.select("svg").append("g").selectAll(".leaf").data(treemap.nodes(root))
-    .enter().append("g")
-            .append("rect")
-    .attr("class", "leaf")
-    .attr("height", function (d) {return Math.max(0, d.dy - 1) + "px";})
-    .attr("width", function (d) {return Math.max(0, d.dx - 1) + "px";})
-    .attr("left",function (d) {return d.x + "px";})
-    .attr("top",function (d) {return d.y + "px";})
-    .attr("y", 50)
-    .attr("x", 50)
-    .style("fill","grey").style("stroke","black").style("position","absolute");                
-    */
-   
-   
-   
-   
-   
-        var cell = svg.svg.append("g").selectAll(".leaf").data(treemap.nodes(root))
-    .enter().append("g")
-    .attr("class", "leaf")
-                .attr("transform", function (d) {
-                    return "translate(" + d.x + "," + d.y + ")";
-                });
-
-        cell.append("rect")
-                .attr("width", function (d) {
-                    return d.dx;
-                })
-                .attr("height", function (d) {
-                    return d.dy;
-                })
-                .style("fill",function(){return colorSelected.color;})
-        .style("fill-opacity", function(){return colorSelected.opacity;})
-                .style("stroke", "#FFF")
-                .style("stroke-width", "1.5").on("click", function (d) {
-                createFinalLevel(blocks,d.blockId,precursorinfo,svg);
-            });
-        
-        //cell.append("textarea").attr("width",200).attr("height","auto");
-        var textPieces = [];
-        var textCell = cell.append("text")
-                .attr("x", 0)
-                .attr("dx", "1.8em")
-                .attr("dy", "1.0em")
-                .attr("text-anchor", "middle")
-                .attr("font-size", "9px").attr("width","auto").attr("height","auto")
-                .text(function (d) {
-                    textPieces[0] = d.sequence1;
-                    textPieces[1] = d.sequence2;
-                    textPieces[2] = d.size;
-                    textPieces[3] = d.amass;
-                    textPieces[4] = d.charge;
-                    textPieces[5] = d.mz;
-                    textPieces[6] = d.blockId;
-                    //return d.title + "\n" + d.sequence1 + "\n" + d.sequence2 + "\n" + d.size + "\n" + d.amass + "\n" + d.charge + "\n" + d.mz + "\n" + d.blockId;
-                    return d.title;
-                });
-                /*
-            textCell.append("tspan").selectAll(".insideText").data(textPieces)
-    .enter()
-    .attr("class", "insideText").attr("x",0).attr("dy", "1.0em");
-                
-                */
-   
-
-               
-            //g.datum(root).selectAll(".node")
-            /*
-    d3.select("svg").append("g").data(treemap.nodes(root))
-  .enter().append("rect")
-            .style("left", function (d) {
-            return d.x + "px";
-        }).style("top", function (d) {
-                    return d.y + "px";
-                }).style("width", function (d) {
-                    return Math.max(0, d.dx - 1) + "px";
-                }) .style("height", function (d) {
-                    return Math.max(0, d.dy - 1) + "px";
-                }).style("border","solid 1px white")
-                        .style("font","10px sans-serif")
-                        .style("line-height","12px")
-                        .style("overflow","hidden")
-                        .style("position","absolute")
-                        .style("text-indent","2px")
-                        .style("background","grey")
-            .text(function (d) {
-                return d.title + " | " + d.sequence1 + " | " + d.sequence2 + " | " + d.size + " | " + d.amass + " | " + d.charge + " | " + d.mz + " | " + d.blockId;
-            }).on("click", function (d) {
-
-       $("svg").empty();
-                createFinalLevel(blocks,d.blockId,precursorinfo);
-            });
-            */
-                 
-/////////////////////////////////////////////////////////////////////
-
-////////////////////////////////////////////////////////////////
-/*
-    var color = d3.scale.category20c();
-
-    var treemap = d3.layout.treemap()
-            .size([width, height])
-            .sticky(true)
-            .value(function (d) {
-                return d.size;
-            });
-
-    var div = d3.select("section").append("div")
-            .style("width", (width + margin.left + margin.right) + "px")
-            .style("height", (height + margin.top + margin.bottom) + "px")
-            .style("left", margin.left + "px")
-            .style("top", margin.top + "px");
-
-    var node = div.datum(root).selectAll(".node")
-            .data(treemap.nodes)
-            .enter().append("div")
-            .attr("class", "node")
-            .call(position)
-            .on("click", function (d) {
-                //d3.select("body").remove();
-        
-                createFinalLevel(blocks,d.blockId,precursorinfo);
+    var cellRect = cell.append("rect")
+            .attr("width", function (d) {
+                return d.dx;
             })
-            .style("background", function (d) {
-                return "grey";
+            .attr("height", function (d) {
+                return d.dy;
             })
+            .style("fill", function () {
+                return colorSelected.color;
+            })
+            .style("fill-opacity", function () {
+                return colorSelected.opacity;
+            })
+            .style("stroke", "#FFF")
+            .style("stroke-width", "2").on("click", function (d) {
+        d3.select("#second").style("visibility", "hidden");
+        createFinalLevel(blocks, d.blockId, precursorinfo);
+    }).append("title")
             .text(function (d) {
-                return d.title + " | " + d.sequence1 + " | " + d.sequence2 + " | " + d.size + " | " + d.amass + " | " + d.charge + " | " + d.mz + " | " + d.blockId;
+                return  "Title: " + d.title + "\n M/Z: " + d.mz + "\n Charge: " + d.charge + "\n T-Mass: " + d.tmass + "\n A-Mass: " + d.amass;
             });
-
-    function position() {
-        this.style("left", function (d) {
-            return d.x + "px";
-        })
-                .style("top", function (d) {
-                    return d.y + "px";
-                })
-                .style("width", function (d) {
-                    return Math.max(0, d.dx - 1) + "px";
-                })
-                .style("height", function (d) {
-                    return Math.max(0, d.dy - 1) + "px";
-                });
-    }
-    */
-    /////////////////////////////////////////////////////////////////////
-    
+    var text = cell.append("foreignObject")
+            .attr("x", 5).attr("y", 5)
+            .attr("dx", "1.8em")
+            .attr("dy", "1.0em")
+            .attr("text-anchor", "middle")
+            .attr("font-size", "10px").attr("color", "#fff").attr("width", function (d) {
+        return d.dx;
+    }).attr("height", function (d) {
+        return d.dy;
+    })
+            .append("xhtml:body")
+            .html(function (d) {
+                var blockData = blocks({id: d.blockId}).get();
+                var textString = "";
+                if (blockData.length !== 0) {
+                    textString = "<div>" + blockData[0].fragment1 + "</div>" + "<br/><div>" + blockData[0].fragment2 + "</div>" + "<br/><div>" + blockData[0].score + "</div>";
+                    return textString;
+                }
+            }).style("overflow", "hidden");
 }
 
-function createFinalLevel(blocks,blockid,precursorinfo,svg){
+function createFinalLevel(blocks, blockid, precursorinfo) {
     var blockdata = blocks({id: blockid}).get();
-    var precursorinfodata = precursorinfo({blockId: blockid+""}).get();
+    var precursorinfodata = precursorinfo({blockId: blockid + ""}).get();
     var counterRelay = 0;
     var character_table = [];
-        var frag1 = blockdata[0].fragment1;
-        var frag2 = blockdata[0].fragment2;
-        
-        
-         var splitseq1 = frag1.match(/./g);
-
+    var frag1 = blockdata[0].fragment1;
+    var frag2 = blockdata[0].fragment2;
+    var splitseq1 = frag1.match(/./g);
     for (var i = 0; i < splitseq1.length; i++) {
         character_table.push({id: counterRelay, uniqueNumber: i, sequence: splitseq1[i].toString().toUpperCase(), type: 1});
         counterRelay++;
     }
-
     var splitseq2 = frag2.match(/./g);
-
     for (var j = 0; j < splitseq2.length; j++) {
         character_table.push({id: counterRelay, uniqueNumber: j, sequence: splitseq2[j].toString().toUpperCase(), type: 2});
         counterRelay++;
     }
-     console.log(character_table);
-     var svgElement = d3.select("svg");
-    var resultArray = displaySequenceTable(character_table,svgElement);
-    
-    
+    var svgElement = d3.select("#third").attr("transform", "translate(200,0)scale(3)");
+    var resultArray = displayCharacterTable(character_table);
     var filteredPoints = [];
-    
-    precursorinfodata.forEach(function(info){
-
+    precursorinfodata.forEach(function (info) {
         var sourceNumber = info.frag1 - 1;
         var targetNumber = info.frag2 - 1;
+
         filteredPoints.push({source: sourceNumber, target: targetNumber, value: parseFloat(info.score)});
     });
     var filteredPointsTaffyObject = TAFFY(filteredPoints);
-
-
-    var drawnPoints = createDataPointsOnMatrix(resultArray.cellHeigts, resultArray.cellWidths, filteredPointsTaffyObject, svg, character_table,blocks,precursorinfo,"brown");
-    
-    /*
-    filteredPoints.push({source: sourceNumber, target: targetNumber, value: parseFloat(maxScore),
-            id: pointObj[0].id, sequence1: pointObj[0].sequence1, sequence2: pointObj[0].sequence2,
-            title: pointObj[0].title, mz: pointObj[0].mz, tmass: pointObj[0].tmass,
-            amass: pointObj[0].amass, charge: pointObj[0].charge});
-            */
+    var drawnPoints = createDataPointsOnMatrixForCharacterTable(resultArray.cellHeigts, resultArray.cellWidths, filteredPointsTaffyObject, character_table, blocks, precursorinfo, "brown");
 }
 
+function displayCharacterTable(character_table) {
+    var rowCount = 0;
+    var columnCount = 0;
+    var seqOneCount = 0;
+    var seqTwoCount = 0;
+    var rowHeaders = [];
+    var columnHeaders = [];
+    var yCount = 0;
+    var xCount = 0;
+    var lengthValue = -3;
+    var lengthValueText = -3;
+    var temp = [];
+    var tempText = [];
+    temp[0] = 3;
+    tempText[0] = 3;
+    var cellHeigts = [];
+    var computedLengthsArray = [];
+    var widthValue = -3;
+    var widthValueText = -3;
+    var anotherTempText = [];
+    anotherTempText[0] = 3;
+    var anotherTemp = [];
+    anotherTemp[0] = 3;
+    var cellWidths = [];
+    var computedLengthsArrayColumn = [];
+    character_table.forEach(function (node) {
+        if (node.type === 1) {
+            columnCount = columnCount + node.sequence.length;
+            columnHeaders[xCount] = node.sequence;
+            seqOneCount++;
+            xCount++;
+        }
+        if (node.type === 2) {
+            rowCount = rowCount + node.sequence.length;
+            rowHeaders[yCount] = node.sequence;
+            yCount++;
+        }
+    });
+    var rect = d3.select("#third").append("rect")
+            .attr("class", "backgroundThrd")
+            .attr("width", d3.select("svg").attr("width"))
+            .attr("height", d3.select("svg").attr("height")).attr("fill", "#A9A9A9");
+    var row = d3.select("#third").selectAll(".row")
+            .data(rowHeaders)
+            .enter().append("g")
+            .attr("class", "row");
+    var rowText = row.append("text")
+            .attr("x", 0)
+            .attr("y", 8.272)
+            .attr("dy", ".32em")
+            .attr("text-anchor", "start")
+            .text(function (d, i) {
+                return d;
+            }).attr("overflow", function (d, i) {
+        computedLengthsArray[i] = this.getComputedTextLength();
 
-function clearSVG(){
-    //$("#mainButton").attr("disabled","false");
-    //$("#mainButton").attr("enabled","true");
-    //$("svg").empty();
-    window.location.reload();
+    });
+    var column = d3.select("#third").selectAll(".column")
+            .data(columnHeaders)
+            .enter().append("g")
+            .attr("class", "column");
+    var columnText = column.append("text")
+            .attr("x", 0)
+            .attr("y", 12.4)
+            .attr("dy", ".32em")
+            .attr("text-anchor", "start")
+            .text(function (d) {
+                return d;
+            }).attr("overflow", function (d, i) {
+        computedLengthsArrayColumn[i] = this.getComputedTextLength();
+
+    });
+    computedLengthsArray.sort();
+    computedLengthsArrayColumn.sort();
+    rowText.attr("transform", function (d, i) {
+        lengthValueText = lengthValueText + tempText[i];
+        tempText[i + 1] = computedLengthsArray[computedLengthsArray.length - 1];
+        var h = lengthValueText;
+        return "translate(0," + h + ")rotate(90)";
+    });
+    columnText.attr("transform", function (d, i) {
+        widthValueText = widthValueText + anotherTempText[i];
+        anotherTempText[i + 1] = computedLengthsArrayColumn[computedLengthsArrayColumn.length - 1];
+        var w = widthValueText;
+        return "translate(" + w + ",-20)";
+    });
+    var newHeight;
+    var totalHeight = 0;
+    computedLengthsArray.forEach(function (l) {
+        totalHeight += computedLengthsArray[computedLengthsArray.length - 1];
+    });
+    newHeight = totalHeight;
+    var newWidth;
+    var totalWidth = 0;
+    computedLengthsArrayColumn.forEach(function (w) {
+        totalWidth += computedLengthsArrayColumn[computedLengthsArrayColumn.length - 1];
+    });
+    newWidth = totalWidth;
+    row.append("line").attr("stroke", "#fff")
+            .attr("x2", newWidth).attr("transform", function (d, i) {
+
+        lengthValue = lengthValue + temp[i];
+        temp[i + 1] = computedLengthsArray[computedLengthsArray.length - 1];
+        var h = lengthValue;
+        cellHeigts.push(h);
+        return "translate(0," + h + ")";
+    });
+    column.append("line").attr("stroke", "#fff")
+            .attr("x1", -newHeight).attr("transform", function (d, i) {
+        widthValue = widthValue + anotherTemp[i];
+        anotherTemp[i + 1] = computedLengthsArrayColumn[computedLengthsArrayColumn.length - 1];
+        var w = widthValue;
+        cellWidths.push(w);
+        return "translate(" + w + ")rotate(-90)";
+    });
+    rect.attr("width", newWidth).attr("height", newHeight);
+    return {
+        cellHeigts: cellHeigts,
+        cellWidths: cellWidths,
+        rectHeight: newHeight,
+        rectWidth: newWidth
+    };
 }
 
+function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, pointsTaffyObject, points_table, blocks, precursorinfo, color, newHeight, newWidth) {
+    var matrix = [];
+    var rowCellHeigtsTemp = [];
+    rowCellHeigtsTemp[0] = 0;
+    var rowCellHeigts = [];
+    rowCellHeigts[0] = 0;
+    var rowColumnWidthsTemp = [];
+    rowColumnWidthsTemp[0] = 0;
+    var rowColumnWidths = [];
+    rowColumnWidths[0] = 0;
+    for (var i = 0; i < cellHeigts.length; i++) {
+        matrix[i] = d3.range(cellWidths.length).map(function (j) {
+            return {x: j, y: i, w: 0, h: 0, positionX: 0, positionY: 0, source: j, target: i, score: 0};
+        });
+    }
+    var points = pointsTaffyObject().get();
+    points.forEach(function (point) {
+        matrix[point.target][point.source].score = point.value;
+    });
+    cellHeigts.forEach(function (height, i) {
+        var temp = rowCellHeigtsTemp[i] - height;
+        i += 1;
+        rowCellHeigtsTemp[i] = height;
+        rowCellHeigts[i] = Math.abs(temp);
+    });
+    cellWidths.forEach(function (width, i) {
+        var temp = rowColumnWidthsTemp[i] - width;
+        i += 1;
+        rowColumnWidthsTemp[i] = width;
+        rowColumnWidths[i] = Math.abs(temp);
+    });
+    rowCellHeigts.shift();
+    rowCellHeigts.shift();
+    rowColumnWidths.shift();
+    rowColumnWidths.shift();
+    rowCellHeigtsTemp.shift();
+    rowColumnWidthsTemp.shift();
+    var existingData = [];
+    matrix.forEach(function (d, i) {
+        d.forEach(function (cell, j) {
+            if (cell.score !== 0) {
+                cell.w = rowColumnWidths[cell.x];
+                cell.h = rowCellHeigts[cell.y];
+                cell.positionX = rowColumnWidthsTemp[cell.x];
+                cell.positionY = rowCellHeigtsTemp[cell.y];
+                existingData.push(cell);
+            }
+        });
+    });
+    var fillOpacities = [];
+    var colorSelected = {color: '', opacity: 0};
+    var blockArraySorted = [];
+    var minScore;
+    var maxScore;
+    if (existingData.length > 1) {
+        blockArraySorted = existingData.sort(function (a, b) {
+            return a.score - b.score;
+        });
+        minScore = blockArraySorted[0].score;
+        maxScore = blockArraySorted[blockArraySorted.length - 1].score;
+    } else {
+        minScore = 0;
+        maxScore = existingData[existingData.length - 1].score;
+    }
+    var z = d3.scale.linear().domain([minScore, maxScore]).range([0.5, 2]).clamp(true);
+    existingData.forEach(function (d, i) {
+        var cell = d3.select("#third").append("rect")
+                .attr("x", d.positionX)
+                .attr("y", d.positionY)
+                .attr("width", d.w - 1)
+                .attr("height", d.h - 1).style("fill", color).style("fill-opacity", function () {
+            var opacityValue = z(d.score);
+            colorSelected.opacity = opacityValue;
+            fillOpacities.push({opacityValue: opacityValue, value: d.score});
+            return opacityValue;
+        });
+    });
+    function compare(a, b) {
+        if (a.score < b.score)
+            return -1;
+        if (a.score > b.score)
+            return 1;
+        return 0;
+    }
+    fillOpacities.sort(compare);
+    createColorLegendForPrecursrData(fillOpacities, color);
+    return existingData;
+}
 
+function createColorLegendForPrecursrData(data, color) {
 
+    d3.select("#firstLegendGroup").remove();
+    var x1 = 50,
+            barWidth = d3.select("svg").attr("width") - margin.right,
+            y1 = 10,
+            barHeight = 20,
+            numberHues = data.length;
+    var idGradient = "legendGradient";
+    var svgForLegendStuff = d3.select("#legendGroup");
+    svgForLegendStuff.append("g").append("defs")
+            .append("linearGradient")
+            .attr("id", idGradient)
+            .attr("x1", "0%")
+            .attr("x2", "100%")
+            .attr("y1", "0%")
+            .attr("y2", "0%");
+    svgForLegendStuff.append("rect")
+            .attr("fill", "url(#" + idGradient + ")")
+            .attr("x", x1)
+            .attr("y", y1)
+            .attr("width", barWidth)
+            .attr("height", barHeight);
+    var textY = y1 + barHeight / 2 + 5;
+    svgForLegendStuff.selectAll(".leftLegend")
+            .data(data)
+            .enter().append("g")
+            .attr("class", "leftLegend").append("text")
+            .attr("text-anchor", "middle")
+            .attr("x", x1 - 20)
+            .attr("y", textY).attr("font-size", "15px")
+            .attr("dy", 0)
+            .text(function (d, i) {
+                if (i === 0) {
+                    return d.value.toFixed(2);
+                }
+                return " ";
+            });
+    svgForLegendStuff.selectAll(".rightLegend")
+            .data(data)
+            .enter().append("g")
+            .attr("class", "rightLegend").append("text")
+            .attr("text-anchor", "left")
+            .attr("x", x1 + barWidth + 10)
+            .attr("y", textY)
+            .attr("font-size", "15px")
+            .attr("dy", 0)
+            .text(function (d, i) {
+                if (i === (data.length - 1)) {
+                    return d.value.toFixed(2);
+                }
+                return " ";
+            });
+    var hueStart = 160, hueEnd = 0;
+    var opacityStart = data[0].opacityValue, opacityEnd = data[data.length - 1].opacityValue;
+    var theHue, rgbString, opacity, p;
+    var deltaPercent = 1 / (numberHues - 1);
+    var deltaHue = (hueEnd - hueStart) / (numberHues - 1);
+    var deltaOpacity = (opacityEnd - opacityStart) / (numberHues - 1);
+    var theData = [];
+    for (var i = 0; i < numberHues; i++) {
+        theHue = hueStart + deltaHue * i;
+        rgbString = color;
+        opacity = opacityStart + deltaOpacity * i;
+        p = 0 + deltaPercent * i;
+        theData.push({"rgb": rgbString, "opacity": opacity, "percent": p});
+    }
+    var stops = d3.select('#' + idGradient).selectAll('stop')
+            .data(theData);
+    stops.enter().append('stop');
+    stops.attr('offset', function (d) {
+        return d.percent;
+    })
+            .attr('stop-color', function (d) {
+                return d.rgb;
+            })
+            .attr('stop-opacity', function (d) {
+                return d.opacity;
+            });
+}

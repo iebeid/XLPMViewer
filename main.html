@@ -6,10 +6,9 @@
 -->
 <html>
     <head>
-        <title>TODO supply a title</title>
+        <title>XLPM Map Viewer</title>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <script src="js/jquery.min.js"></script>
         <script src="js/d3.v3.min.js"></script>
         <script src="js/taffy.js"></script>
         <script src="js/orange.js"></script>
@@ -17,25 +16,32 @@
     </head>
     <body>
         <header>
-            <div class="module"><h1>XLPM Map Viewer</h1></div>
+            <div class="module">XLPM Map Viewer</div>
         </header>
         <nav>
             <div class="module">
-                <fieldset>
-                <legend>Visualization</legend>
-                <p>Please choose fasta file to parse</p>
-                <input type="file" id="fastafile"/><br/>
-                <p>Please choose data file to parse</p>
-                <input type="file" id="datafile"/><br/><br/>
-                <button id="mainButton" type="button" onclick="main(fastaText, dataText)">Visualize</button><br/><br/>
-                <button type="button" onclick="clearSVG()">Clear</button><br/><br/>
-                </fieldset>
+                <div>
+                Please choose fasta file to parse
+                <input type="file" id="fastafile"/>
+                </div><br/>
+                <div>
+                Please choose data file to parse
+                <input type="file" id="datafile"/>
+                </div><br/>
+                <div>
+                <button id="mainButton" type="button" onclick="main(fastaText, dataText)">Visualize</button>
+                <button type="button" onclick="clearSVG()">Clear</button>
+                </div>
             </div>
         </nav>
         <section>
+            <div id="vis" class="module">
+            </div>
         </section>
         <footer>
-            Copyright © UALR.EDU
+            <div class="module">
+                Copyright © 2015 Mihir Jaiswal & Islam Akef Ebeid 
+            </div>
         </footer>
     </body>
 </html>
