@@ -49,25 +49,34 @@ function main(fastaFile, dataFile) {
     var resultArray = displaySequenceTable(sequence_table);
     var points = createPointsTable(sequences, blocks);
     var drawnPoints = createDataPointsOnMatrix(resultArray.cellHeigts, resultArray.cellWidths, points.filteredPointsTable, points.points_table, blocks, precursorinfo, "#000099", resultArray.rectHeight, resultArray.rectWidth);
+    createSlider();
+    resetViewSVG();
     d3.select("#mainButton").attr("disabled", "true");
 }
-margin = 0;
-function init() {
-    margin = {top: 100, right: 135, bottom: 10, left: window.innerWidth / 5};
+
+function resetViewSVG() {
     var width = document.getElementById("vis").clientWidth;
-    var height = document.getElementById("vis").clientWidth;
-    var viewBoxValue = "0 0 " + width + " " + height;
-    var svg = d3.select("#vis").append("svg").attr("width", width)
-            .attr("height", height)
-            .attr("viewBox", viewBoxValue).attr("preserveAspectRatio", "xMinYMin meet").attr("id", "mainSVG")
-            .style("font-family", "Helvetica").style("font-size", "10px").append("g").attr("id", "mainGroup");
-    var legendGroup = svg.append("g").attr("id", "legendGroup").attr("transform", "translate(0,0)");
-    var scaleGroup = svg.append("g").attr("id", "scaleGroup").attr("transform", "translate(50,25)");
-    var visGroup = svg.append("g").attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    var el = document.getElementById("mainGroup");
+    var rect = el.getBoundingClientRect();
+    var shape = document.getElementById("mainSVG");
+    var viewBoxValue = "0 0 " + width + " " + rect.height;
+    shape.setAttribute("height", rect.height);
+    shape.setAttribute("viewBox", viewBoxValue);
+    shape.setAttribute("preserveAspectRatio", "xMinYMin meet");
+}
+
+function init() {
+    var margin = 25;
+    var svg = d3.select("#vis").append("svg").attr("width", "100%").attr("height", "100%").attr("id", "mainSVG");
+    svg.style("object-fit", "contain").style("font-family", "Helvetica").style("font-size", "10px");
+    var mainGroup = svg.append("g").attr("id", "mainGroup").attr("width", "100%").attr("height", "100%");
+    var infoGroup = mainGroup.append("g").attr("id", "infoGroup").attr("transform", "translate(" + margin + "," + margin + ")");
+    var legendGroup = infoGroup.append("g").attr("id", "legendGroup").attr("transform", "translate(" + margin * 0 + "," + margin * 0 + ")");
+    var scaleGroup = infoGroup.append("g").attr("id", "scaleGroup").attr("transform", "translate(" + 2 * margin + "," + margin + ")");
+    var visGroup = mainGroup.append("g").attr("id", "visGroup").attr("transform", "translate(" + margin + "," + 5 * margin + ")scale(0.2)");
     var firstLayerGroup = visGroup.append("g").attr("id", "first");
     var secondLayerGroup = visGroup.append("g").attr("id", "second");
     var thirdLayerGroup = visGroup.append("g").attr("id", "third");
-    createSlider();
 }
 
 function clearSVG() {
@@ -76,40 +85,16 @@ function clearSVG() {
 
 function createSlider() {
     var height = 20;
-    var width = d3.select("svg").attr("width") - margin.right;
-    var x = d3.scale.linear()
-            .domain([0.1, 1.5]).range([0, width]).clamp(true);
-    var brush = d3.svg.brush()
-            .x(x)
-            .extent([0, 0])
-            .on("brush", brushed);
+    var width = 1200;
+    var x = d3.scale.linear().domain([0.1, 1.5]).range([0, width]).clamp(true);
+    var brush = d3.svg.brush().x(x).extent([0, 0]).on("brush", brushed);
     var svg = d3.select("#scaleGroup");
-    svg.append("g")
-            .attr("class", "x axis")
-            .attr("transform", "translate(0," + height / 2 + ")")
-            .call(d3.svg.axis()
-                    .scale(x)
-                    .orient("bottom")
-                    .tickSize(1)
-                    .tickPadding(10).tickValues([0, 100]));
-    var slider = svg.append("g")
-            .attr("class", "slider")
-            .call(brush);
-    slider.selectAll(".extent,.resize")
-            .remove();
-    slider.select(".background")
-            .attr("height", height);
-    var handle = slider.append("circle")
-            .attr("class", "handle")
-            .attr("transform", "translate(0," + height / 2 + ")")
-            .attr("r", 5);
-    slider
-            .call(brush.event)
-            .transition()
-            .duration(750)
-            .call(brush.extent([70, 70]))
-            .call(brush.event);
-
+    svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height / 2 + ")").call(d3.svg.axis().scale(x).orient("bottom").tickSize(1).tickPadding(10).tickValues([0, 100]));
+    var slider = svg.append("g").attr("class", "slider").call(brush);
+    slider.selectAll(".extent,.resize").remove();
+    slider.select(".background").attr("height", height);
+    var handle = slider.append("circle").attr("class", "handle").attr("transform", "translate(0," + height / 2 + ")").attr("r", 5);
+    slider.call(brush.event).transition().duration(750).call(brush.extent([70, 70])).call(brush.event);
     function brushed() {
         var value = 1;
         if (d3.event.sourceEvent) {
@@ -122,6 +107,35 @@ function createSlider() {
     }
 }
 
+function checkForSpecialCharacters(sequence) {
+    var specialChars = ["!", "@", "#", "$", "%", "^"];
+    var specialCharactersObjectsArray = [{char: "!", rep: "C"}, {char: "@", rep: "C"}, {char: "#", rep: "C"}, {char: "$", rep: "M"}, {char: "%", rep: "N"}, {char: "^", rep: "Q"}];
+    var input = sequence.toString();
+    var specialCharactersObjectsArrayTaffy = TAFFY(specialCharactersObjectsArray);
+    var str;
+    var indecies = [];
+    function setCharAt(str, index, chr) {
+        var returnStr;
+        for (var i = 0; i < str.length; i++) {
+            var firsPart = str.substring(0, index);
+            var secondPart = str.substring(index + 1, str.length);
+            returnStr = firsPart + chr + secondPart;
+        }
+        return returnStr;
+    }
+    for (var i = 0; i < input.length; i++) {
+        if (specialChars.indexOf(input[i]) !== -1) {
+            indecies.push(i);
+        }
+    }
+    var pears = input;
+    for (var i = 0; i < indecies.length; i++) {
+        var obj = specialCharactersObjectsArrayTaffy({char: input.charAt(indecies[i])}).get();
+        pears = setCharAt(pears, indecies[i], obj[0].rep);
+    }
+    return pears;
+}
+
 function createSequenceTable(fastaFile) {
     var sequence_table = [];
     var countValid = 0;
@@ -131,26 +145,47 @@ function createSequenceTable(fastaFile) {
     var lines = fastaFile.split('\n');
     for (var j = 0; j < lines.length; j++) {
         var line = lines[j];
-        if (line[0] === '>') {
-            countValid++;
-            continue;
+        line = line.trim();
+        if (line.length !== 0) {
+            if (line[0] === '>') {
+                countValid++;
+                continue;
+            }
+            if (countValid === 1) {
+                firstSeq += line;
+            }
+            if (countValid > 1) {
+                secondSeq += line;
+            }
         }
-        if (countValid === 1) {
-            firstSeq = firstSeq + line;
-        }
-        if (countValid > 1) {
-            secondSeq = secondSeq + line;
-        }
+    }
+    if (firstSeq[firstSeq.length - 1] !== "K") {
+        firstSeq = firstSeq + "#K";
+    }
+    if (secondSeq[secondSeq.length - 1] !== "K") {
+        secondSeq = secondSeq + "#K";
     }
     var splitseq1 = firstSeq.match(/([^KR])*[KR]?/g);
     splitseq1.pop();
     for (var i = 0; i < splitseq1.length; i++) {
+        if (i === splitseq1.length - 1) {
+            var lastElement = splitseq1[i];
+            if (lastElement[lastElement.length - 2] === "#") {
+                splitseq1[i] = splitseq1[i].substring(0, lastElement.length - 2);
+            }
+        }
         sequence_table.push({id: counterRelay, uniqueNumber: i, sequence: splitseq1[i].toString().toUpperCase(), type: 1});
         counterRelay++;
     }
     var splitseq2 = secondSeq.match(/([^KR])*[KR]?/g);
     splitseq2.pop();
     for (var j = 0; j < splitseq2.length; j++) {
+        if (j === splitseq2.length - 1) {
+            var lastElement = splitseq2[j];
+            if (lastElement[lastElement.length - 2] === "#") {
+                splitseq2[j] = splitseq2[j].substring(0, lastElement.length - 2);
+            }
+        }
         sequence_table.push({id: counterRelay, uniqueNumber: j, sequence: splitseq2[j].toString().toUpperCase(), type: 2});
         counterRelay++;
     }
@@ -160,21 +195,23 @@ function createSequenceTable(fastaFile) {
 function createBlockTable(dataFile) {
     var blocks = [];
     var precursorinfo = [];
-    var lines = dataFile.split('\n');
+    var lines = dataFile.split("\n");
     var reactionCounter = 0;
     for (var j = 2; j < lines.length; j++) {
         var line = lines[j];
         if (line.length > 0) {
             if (isNaN(line[0])) {
-                var splitseq = line.match(/[\S]+/g);
-                blocks.push({id: reactionCounter, title: splitseq[0], mz: splitseq[1], fragment1: splitseq[2], fragment2: splitseq[3], tmass: splitseq[4],
-                    amass: splitseq[5], charge: splitseq[6], score: splitseq[7]});
+                var splitseq = line.split("\t");
+                var frag1Filtered = checkForSpecialCharacters(splitseq[2].toString().toUpperCase());
+                var frag2Filtered = checkForSpecialCharacters(splitseq[3].toString().toUpperCase());
+                blocks.push({id: reactionCounter, title: splitseq[0], mz: splitseq[1], fragment1: frag1Filtered.toString(), fragment2: frag2Filtered.toString(), tmass: splitseq[4], amass: splitseq[5], charge: splitseq[6], score: splitseq[7]});
                 reactionCounter++;
             }
             else {
-                var info = reactionCounter + "  " + line;
-                var splitinfo = info.match(/[\S]+/g);
-                precursorinfo.push({blockId: splitinfo[0], frag1: splitinfo[1], frag2: splitinfo[2], score: splitinfo[3]});
+                var info = reactionCounter + line;
+                var splitinfo = info.split("\t");
+
+                precursorinfo.push({blockId: splitinfo[0], frag1: splitinfo[2], frag2: splitinfo[3], score: splitinfo[4]});
             }
         }
     }
@@ -185,37 +222,43 @@ function createPointsTable(sequences, blocks) {
     var points = [];
     var filteredPoints = [];
     var pointsID = 0;
-    function getUniqueNumbers(fragment, type, sequence) {
-        var uniqueNumbers = [];
-        var correctedUniqueNumber = 0;
-        var correctedUniqueNumberTemp;
-        var dividedFrag = fragment.toString().toUpperCase().match(/([^KR])*[KR]?/g);
-        dividedFrag.pop();
-        var result = sequences({sequence: dividedFrag[0], type: type}).get();
-        if (result.length > 0) {
-            dividedFrag.forEach(function (seq, i) {
-                var calcNumber = (result[0].uniqueNumber) + i;
-                uniqueNumbers.push({calcNumber: calcNumber, sequence: seq});
-            });
-            var uniqueNumbersTable = TAFFY(uniqueNumbers);
-            correctedUniqueNumberTemp = uniqueNumbersTable({sequence: sequence}).get();
-            correctedUniqueNumber = correctedUniqueNumberTemp[0].calcNumber;
+    function getUniqueNumberForSequence(fragment, sequence, type) {
+        var uniqueNumber;
+        var seqObject = sequences({sequence: sequence, type: type}).get();
+        if (seqObject.length === 0) {
+            alert("Data file does not match FASTA file!");
+            clearSVG();
+            return;
         }
-        return correctedUniqueNumber;
+        if (seqObject.length === 1) {
+            uniqueNumber = seqObject[0].uniqueNumber;
+        }
+        if (seqObject.length > 1) {
+            seqObject.forEach(function (seqObj, j) {
+                var dividedFrag = fragment.toString().toUpperCase().match(/([^KR])*[KR]?/g);
+                dividedFrag.pop();
+                dividedFrag.forEach(function (seq, i) {
+                    if (sequence === seq) {
+                        var dividedFragObj = sequences({sequence: dividedFrag[0], type: type}).get();
+                        uniqueNumber = dividedFragObj[0].uniqueNumber + i;
+                    }
+                });
+            });
+        }
+        return uniqueNumber;
     }
     var result = blocks().get();
     result.forEach(function (r) {
         var seqs1 = r.fragment1;
-        var splitseq1 = seqs1.toString().toUpperCase().match(/([^KR])*[KR]?/g);
+        var splitseq1 = seqs1.match(/([^KR])*[KR]?/g);
         splitseq1.pop();
         var seqs2 = r.fragment2;
-        var splitseq2 = seqs2.toString().toUpperCase().match(/([^KR])*[KR]?/g);
+        var splitseq2 = seqs2.match(/([^KR])*[KR]?/g);
         splitseq2.pop();
         splitseq1.forEach(function (s1) {
             splitseq2.forEach(function (s2) {
-                var sourceNumber = getUniqueNumbers(seqs1.toString().toUpperCase(), 1, s1);
-
-                var targetNumber = getUniqueNumbers(seqs2.toString().toUpperCase(), 2, s2);
+                var sourceNumber = getUniqueNumberForSequence(seqs1.toString().toUpperCase(), s1, 1);
+                var targetNumber = getUniqueNumberForSequence(seqs2.toString().toUpperCase(), s2, 2);
                 points.push({id: pointsID, blockId: r.id, sequence1: s1, sequence2: s2, score: r.score, sourceNumber: sourceNumber, targetNumber: targetNumber, title: r.title, mz: r.mz, tmass: r.tmass,
                     amass: r.amass, charge: r.charge});
                 pointsID++;
@@ -295,6 +338,7 @@ function displaySequenceTable(sequence_table) {
                 return d;
             }).attr("transform", function (d, i) {
         computedLengthsArray[i] = this.getComputedTextLength();
+
         lengthValueText = lengthValueText + tempText[i];
         tempText[i + 1] = computedLengthsArray[i];
         var h = lengthValueText;
@@ -347,6 +391,10 @@ function displaySequenceTable(sequence_table) {
         return "translate(" + w + ")rotate(-90)";
     });
     rect.attr("width", newWidth).attr("height", newHeight);
+    var cellHeightLastElement = cellHeigts[cellHeigts.length - 1] + computedLengthsArray[computedLengthsArray.length - 1];
+    var cellWidthsLastElement = cellWidths[cellWidths.length - 1] + computedLengthsArrayColumn[computedLengthsArrayColumn.length - 1];
+    cellHeigts.push(cellHeightLastElement);
+    cellWidths.push(cellWidthsLastElement);
     return {
         cellHeigts: cellHeigts,
         cellWidths: cellWidths,
@@ -367,22 +415,22 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
     rowColumnWidths[0] = 0;
     for (var i = 0; i < cellHeigts.length; i++) {
         matrix[i] = d3.range(cellWidths.length).map(function (j) {
-            return {x: i, y: j, w: 0, h: 0, positionX: 0, positionY: 0, title: '', mz: 0, tmass: 0,
+            return {w: 0, h: 0, positionX: 0, positionY: 0, title: '', mz: 0, tmass: 0,
                 amass: 0, charge: 0, sequence1: '', sequence2: '', source: 0, target: 0, value: 0};
         });
     }
     var points = pointsTaffyObject().get();
     points.forEach(function (point) {
-        matrix[point.source][point.target].title = point.title;
-        matrix[point.source][point.target].mz = point.mz;
-        matrix[point.source][point.target].tmass = point.tmass;
-        matrix[point.source][point.target].amass = point.amass;
-        matrix[point.source][point.target].charge = point.charge;
-        matrix[point.source][point.target].sequence1 = point.sequence1;
-        matrix[point.source][point.target].sequence2 = point.sequence2;
-        matrix[point.source][point.target].source = point.source;
-        matrix[point.source][point.target].target = point.target;
-        matrix[point.source][point.target].value = point.value;
+        matrix[point.target][point.source].title = point.title;
+        matrix[point.target][point.source].mz = point.mz;
+        matrix[point.target][point.source].tmass = point.tmass;
+        matrix[point.target][point.source].amass = point.amass;
+        matrix[point.target][point.source].charge = point.charge;
+        matrix[point.target][point.source].sequence1 = point.sequence1;
+        matrix[point.target][point.source].sequence2 = point.sequence2;
+        matrix[point.target][point.source].source = point.target;
+        matrix[point.target][point.source].target = point.source;
+        matrix[point.target][point.source].value = point.value;
     });
     cellHeigts.forEach(function (height, i) {
         var temp = rowCellHeigtsTemp[i] - height;
@@ -396,6 +444,7 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
         rowColumnWidthsTemp[i] = width;
         rowColumnWidths[i] = Math.abs(temp);
     });
+
     rowCellHeigts.shift();
     rowCellHeigts.shift();
     rowColumnWidths.shift();
@@ -406,14 +455,15 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
     matrix.forEach(function (d, i) {
         d.forEach(function (cell, j) {
             if (cell.value !== 0) {
-                cell.w = rowColumnWidths[cell.x];
-                cell.h = rowCellHeigts[cell.y];
-                cell.positionX = rowColumnWidthsTemp[cell.x];
-                cell.positionY = rowCellHeigtsTemp[cell.y];
+                cell.w = rowColumnWidths[j];
+                cell.h = rowCellHeigts[i];
+                cell.positionX = rowColumnWidthsTemp[j];
+                cell.positionY = rowCellHeigtsTemp[i];
                 existingData.push(cell);
             }
         });
     });
+
     var fillOpacities = [];
     var colorSelected = {color: '', opacity: 0};
     var blockArraySorted = existingData.sort(function (a, b) {
@@ -423,6 +473,7 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
     var maxScore = blockArraySorted[blockArraySorted.length - 1].value;
     var z = d3.scale.linear().domain([minScore, maxScore]).range([0.1, 1]);
     existingData.forEach(function (d, i) {
+        var fillOpacitiesTaffy;
         var cell = d3.select("#first").append("rect")
                 .attr("x", d.positionX)
                 .attr("y", d.positionY)
@@ -431,16 +482,21 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
             var opacityValue = z(d.value);
             colorSelected.opacity = opacityValue;
             fillOpacities.push({opacityValue: opacityValue, value: d.value});
+            fillOpacitiesTaffy = TAFFY(fillOpacities);
             return opacityValue;
         })
                 .on("click", function () {
                     colorSelected.color = color;
+                    var opacityObject = fillOpacitiesTaffy({value: d.value}).get();
+                    colorSelected.opacity = opacityObject[0].opacityValue;
                     d3.select("#first").style("visibility", "hidden");
                     createTreemap(points_table, d.sequence1, d.sequence2, blocks, precursorinfo, colorSelected);
+                    resetViewSVG();
                 })
                 .append("title")
                 .text("Sequence 1: " + d.sequence1 + "\nSequence 2: " + d.sequence2 + "\nScore: " + d.value);
     });
+
     function compare(a, b) {
         if (a.value < b.value)
             return -1;
@@ -462,7 +518,7 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
 
 function createColorLegend(data) {
     var x1 = 50,
-            barWidth = d3.select("svg").attr("width") - margin.right,
+            barWidth = 1200,
             y1 = 10,
             barHeight = 20,
             numberHues = data.length;
@@ -584,16 +640,24 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
             .style("stroke-width", "2").on("click", function (d) {
         d3.select("#second").style("visibility", "hidden");
         createFinalLevel(blocks, d.blockId, precursorinfo);
+        resetViewSVG();
     }).append("title")
             .text(function (d) {
-                return  "Title: " + d.title + "\n M/Z: " + d.mz + "\n Charge: " + d.charge + "\n T-Mass: " + d.tmass + "\n A-Mass: " + d.amass;
+                return  "Title: " + d.title + "\n M/Z: " + d.mz + "\n Charge: " + d.charge + "\n T-Mass: " + d.tmass + "\n E-Mass: " + d.amass;
             });
     var text = cell.append("foreignObject")
             .attr("x", 5).attr("y", 5)
             .attr("dx", "1.8em")
             .attr("dy", "1.0em")
             .attr("text-anchor", "middle")
-            .attr("font-size", "10px").attr("color", "#fff").attr("width", function (d) {
+            .attr("font-size", "10px").attr("color", function (d) {
+        if (d.size > 0.2) {
+            return "#fff";
+        }
+        else if (d.size < 0.2) {
+            return "#000";
+        }
+    }).attr("width", function (d) {
         return d.dx;
     }).attr("height", function (d) {
         return d.dy;
@@ -632,7 +696,6 @@ function createFinalLevel(blocks, blockid, precursorinfo) {
     precursorinfodata.forEach(function (info) {
         var sourceNumber = info.frag1 - 1;
         var targetNumber = info.frag2 - 1;
-
         filteredPoints.push({source: sourceNumber, target: targetNumber, value: parseFloat(info.score)});
     });
     var filteredPointsTaffyObject = TAFFY(filteredPoints);
@@ -686,8 +749,15 @@ function displayCharacterTable(character_table) {
             .enter().append("g")
             .attr("class", "row");
     var rowText = row.append("text")
-            .attr("x", 0)
-            .attr("y", 8.272)
+            .attr("x", function (d) {
+                if (d === "I") {
+                    return 2.5;
+                }
+                else {
+                    return 0;
+                }
+            })
+            .attr("y", 8)
             .attr("dy", ".32em")
             .attr("text-anchor", "start")
             .text(function (d, i) {
@@ -701,8 +771,15 @@ function displayCharacterTable(character_table) {
             .enter().append("g")
             .attr("class", "column");
     var columnText = column.append("text")
-            .attr("x", 0)
-            .attr("y", 12.4)
+            .attr("x", function (d) {
+                if (d === "I") {
+                    return 2.5;
+                }
+                else {
+                    return 0;
+                }
+            })
+            .attr("y", 12)
             .attr("dy", ".32em")
             .attr("text-anchor", "start")
             .text(function (d) {
@@ -739,7 +816,6 @@ function displayCharacterTable(character_table) {
     newWidth = totalWidth;
     row.append("line").attr("stroke", "#fff")
             .attr("x2", newWidth).attr("transform", function (d, i) {
-
         lengthValue = lengthValue + temp[i];
         temp[i + 1] = computedLengthsArray[computedLengthsArray.length - 1];
         var h = lengthValue;
@@ -775,7 +851,7 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
     rowColumnWidths[0] = 0;
     for (var i = 0; i < cellHeigts.length; i++) {
         matrix[i] = d3.range(cellWidths.length).map(function (j) {
-            return {x: j, y: i, w: 0, h: 0, positionX: 0, positionY: 0, source: j, target: i, score: 0};
+            return {w: 0, h: 0, positionX: 0, positionY: 0, source: j, target: i, score: 0};
         });
     }
     var points = pointsTaffyObject().get();
@@ -804,10 +880,10 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
     matrix.forEach(function (d, i) {
         d.forEach(function (cell, j) {
             if (cell.score !== 0) {
-                cell.w = rowColumnWidths[cell.x];
-                cell.h = rowCellHeigts[cell.y];
-                cell.positionX = rowColumnWidthsTemp[cell.x];
-                cell.positionY = rowCellHeigtsTemp[cell.y];
+                cell.w = rowColumnWidths[j];
+                cell.h = rowCellHeigts[i];
+                cell.positionX = rowColumnWidthsTemp[j];
+                cell.positionY = rowCellHeigtsTemp[i];
                 existingData.push(cell);
             }
         });
@@ -823,9 +899,14 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
         });
         minScore = blockArraySorted[0].score;
         maxScore = blockArraySorted[blockArraySorted.length - 1].score;
-    } else {
+    }
+    if (existingData.length === 1) {
         minScore = 0;
-        maxScore = existingData[existingData.length - 1].score;
+        maxScore = existingData[0].score;
+    }
+    if (existingData.length === 0) {
+        minScore = 0;
+        maxScore = 0;
     }
     var z = d3.scale.linear().domain([minScore, maxScore]).range([0.5, 2]).clamp(true);
     existingData.forEach(function (d, i) {
@@ -853,10 +934,13 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
 }
 
 function createColorLegendForPrecursrData(data, color) {
-
+    if (data.length === 0) {
+        data[0] = [{opacityValue: 0, value: 0}];
+        color = "#fff";
+    }
     d3.select("#firstLegendGroup").remove();
     var x1 = 50,
-            barWidth = d3.select("svg").attr("width") - margin.right,
+            barWidth = 1200,
             y1 = 10,
             barHeight = 20,
             numberHues = data.length;
