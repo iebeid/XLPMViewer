@@ -4,115 +4,139 @@
  * 
  */
 
-var fastaText = "";
-var dataText = "";
-window.onload = function () {
-    d3.select("#vis").style("visibility", "hidden");
-    var fastafileInput = document.getElementById('fastafile');
-    fastafileInput.addEventListener('change', function (e) {
-        var file = fastafileInput.files[0];
-        var textType = /fasta.*/;
-        if (file.name.match(textType)) {
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                fastaText = reader.result;
-            };
-            reader.readAsText(file);
-        } else {
-            alert("File not supported!");
-        }
-    });
-    var datafileInput = document.getElementById('datafile');
-    datafileInput.addEventListener('change', function (e) {
-        var file = datafileInput.files[0];
-        var textType = /txt.*/;
-        if (file.name.match(textType)) {
-            var reader = new FileReader();
-            reader.onload = function (e) {
-                dataText = reader.result;
-            };
-            reader.readAsText(file);
-        } else {
-            alert("File not supported!");
-        }
-    });
-};
+unit = 25;
+scaleValue = 1;
+fileWeight = 0;
 
 function main(fastaFile, dataFile) {
     d3.select("#vis").style("visibility", "visible");
+    var dim = calculateLWSVG(fastaFile);
     var sequence_table = createSequenceTable(fastaFile);
     var sequences = TAFFY(sequence_table);
     var block_table = createBlockTable(dataFile);
     var blocks = TAFFY(block_table.blocks);
     var precursorinfo = TAFFY(block_table.precursorinfo);
-    init();
-    var resultArray = displaySequenceTable(sequence_table);
+    var initObj = init(dim);
+    var resultArray = displaySequenceTable(sequence_table, initObj.width, initObj.height);
     var points = createPointsTable(sequences, blocks);
-    var drawnPoints = createDataPointsOnMatrix(resultArray.cellHeigts, resultArray.cellWidths, points.filteredPointsTable, points.points_table, blocks, precursorinfo, "#000099", resultArray.rectHeight, resultArray.rectWidth);
+    createDataPointsOnMatrix(resultArray.cellHeigts, resultArray.cellWidths, points.filteredPointsTable, points.points_table, blocks, precursorinfo, "#000099", resultArray.rectHeight, resultArray.rectWidth);
     createSlider();
-    resetViewSVG();
     d3.select("#mainButton").attr("disabled", "true");
 }
 
-function resetViewSVG() {
-    var width = document.getElementById("vis").clientWidth;
-    var el = document.getElementById("mainGroup");
-    var rect = el.getBoundingClientRect();
-    var shape = document.getElementById("mainSVG");
-    var viewBoxValue = "0 0 " + width + " " + rect.height;
-    shape.setAttribute("height", rect.height);
-    shape.setAttribute("viewBox", viewBoxValue);
-    shape.setAttribute("preserveAspectRatio", "xMinYMin meet");
+function init(svgDim) {
+    var width = svgDim.w;
+    var height = svgDim.h;
+    var svg = d3.select("#vis").append("svg").attr("width", "100%").attr("height", "100%").attr("viewBox", "0 0 " + width + " " + height)
+            .attr("preserveAspectRatio", "xMinYMin meet").attr("id", "mainSVG");
+    svg.style("font-family", "Helvetica").style("font-size", "10px");
+    var gridGroup = svg.append("g").attr("id", "gridGroup");
+    var infoGroup = svg.append("g").attr("id", "infoGroup").attr("transform", "translate(" + unit + "," + unit + ")");
+    infoGroup.append("g").attr("id", "legendGroup");
+    infoGroup.append("g").attr("id", "scaleGroup").attr("transform", "translate(" + 3 * unit + "," + (unit + unit / 2) + ")");
+    var visGroup = svg.append("g").attr("id", "visGroup").attr("transform", "translate(" + unit + "," + 5 * unit + ")");
+    visGroup.append("g").attr("id", "first");
+    visGroup.append("g").attr("id", "second");
+    visGroup.append("g").attr("id", "third");
+    drawSVG(gridGroup, width, height);
+    return {width: width, height: height};
 }
 
-function init() {
-    var margin = 25;
-    var svg = d3.select("#vis").append("svg").attr("width", "100%").attr("height", "100%").attr("id", "mainSVG");
-    svg.style("object-fit", "contain").style("font-family", "Helvetica").style("font-size", "10px");
-    var mainGroup = svg.append("g").attr("id", "mainGroup").attr("width", "100%").attr("height", "100%");
-    var infoGroup = mainGroup.append("g").attr("id", "infoGroup").attr("transform", "translate(" + margin + "," + margin + ")");
-    var legendGroup = infoGroup.append("g").attr("id", "legendGroup").attr("transform", "translate(" + margin * 0 + "," + margin * 0 + ")");
-    var scaleGroup = infoGroup.append("g").attr("id", "scaleGroup").attr("transform", "translate(" + 2 * margin + "," + margin + ")");
-    var visGroup = mainGroup.append("g").attr("id", "visGroup").attr("transform", "translate(" + margin + "," + 5 * margin + ")scale(0.2)");
-    var firstLayerGroup = visGroup.append("g").attr("id", "first");
-    var secondLayerGroup = visGroup.append("g").attr("id", "second");
-    var thirdLayerGroup = visGroup.append("g").attr("id", "third");
+//Create main SVG element
+
+function calculateLWSVG(fastaFile) {
+    var countValid = 0;
+    var firstSeq = "";
+    var secondSeq = "";
+    var lines = fastaFile.split('\n');
+    for (var j = 0; j < lines.length; j++) {
+        var line = lines[j];
+        line = line.trim();
+        if (line.length !== 0) {
+            if (line[0] === '>') {
+                countValid++;
+                continue;
+            }
+            if (countValid === 1) {
+                firstSeq += line;
+            }
+            if (countValid > 1) {
+                secondSeq += line;
+            }
+        }
+    }
+    var calculatedHeight = ((secondSeq.length + 2) * 6.78) + 121;
+    var calculatedWidth = document.getElementById("vis").clientWidth - 28;
+    unit = (calculatedWidth / calculatedHeight) * 1.68 + 20;
+    fileWeight = firstSeq.length * secondSeq.length;
+    return {w: calculatedWidth, h: calculatedHeight};
+}
+
+function drawSVG(gridGroup, width, height) {
+    var widthRatio = width / (4.15 * unit);
+    var heightRatio = height / (3.9 * unit);
+    var data = [];
+    for (var k = 0; k < heightRatio; k++) {
+        data.push(d3.range(widthRatio));
+    }
+    var grp = gridGroup.selectAll("g")
+            .data(data)
+            .enter()
+            .append("g")
+            .attr("transform", function (d, i) {
+                return "translate(0, " + (4 * unit) * i + ")";
+            });
+    grp.selectAll("rect")
+            .data(function (d) {
+                return d;
+            })
+            .enter()
+            .append("rect")
+            .attr("x", function (d, i) {
+                return (4 * unit) * i;
+            })
+            .attr("width", (4 * unit))
+            .attr("height", (4 * unit))
+            .style("fill", "#fff")
+            .style("stroke", "#ccc")
+            .style("stroke-width", "1");
 }
 
 function clearSVG() {
     window.location.reload();
 }
 
-function createSlider() {
-    var height = 20;
-    var width = 1200;
-    var x = d3.scale.linear().domain([0.1, 1.5]).range([0, width]).clamp(true);
-    var brush = d3.svg.brush().x(x).extent([0, 0]).on("brush", brushed);
-    var svg = d3.select("#scaleGroup");
-    svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height / 2 + ")").call(d3.svg.axis().scale(x).orient("bottom").tickSize(1).tickPadding(10).tickValues([0, 100]));
-    var slider = svg.append("g").attr("class", "slider").call(brush);
-    slider.selectAll(".extent,.resize").remove();
-    slider.select(".background").attr("height", height);
-    var handle = slider.append("circle").attr("class", "handle").attr("transform", "translate(0," + height / 2 + ")").attr("r", 5);
-    slider.call(brush.event).transition().duration(750).call(brush.extent([70, 70])).call(brush.event);
-    function brushed() {
-        var value = 1;
-        if (d3.event.sourceEvent) {
-            value = x.invert(d3.mouse(this)[0]);
-            brush.extent([value, value]);
-        }
-        handle.attr("cx", x(value));
-        d3.select("#first").attr("transform", "scale(" + value + ")");
-        d3.select("#second").attr("transform", "scale(" + value + ")");
-    }
+function minimize(group, x, y, value) {
+    var s = Snap(group);
+    var g = s;
+    var myMatrix = new Snap.Matrix();
+    myMatrix.scale(value, value);
+    myMatrix.translate(x, y);
+    myMatrix.invert();
+    g.animate({transform: myMatrix}, 2000, mina.bounce, function () {
+        g.animate({transform: myMatrix}, 2000, mina.bounce);
+    });
 }
+
+function maximize(group, x, y, value) {
+    var s = Snap(group);
+    var g = s;
+    var myMatrix = new Snap.Matrix();
+    myMatrix.scale(value, value);
+    myMatrix.translate(x, y);
+    myMatrix.invert();
+    g.animate({transform: myMatrix}, 2000, mina.bounce, function () {
+        g.animate({transform: myMatrix}, 2000, mina.bounce);
+    });
+}
+
+//Parse data from the 2 input files (fasta , spectra data)
 
 function checkForSpecialCharacters(sequence) {
     var specialChars = ["!", "@", "#", "$", "%", "^"];
     var specialCharactersObjectsArray = [{char: "!", rep: "C"}, {char: "@", rep: "C"}, {char: "#", rep: "C"}, {char: "$", rep: "M"}, {char: "%", rep: "N"}, {char: "^", rep: "Q"}];
     var input = sequence.toString();
     var specialCharactersObjectsArrayTaffy = TAFFY(specialCharactersObjectsArray);
-    var str;
     var indecies = [];
     function setCharAt(str, index, chr) {
         var returnStr;
@@ -283,11 +307,122 @@ function createPointsTable(sequences, blocks) {
     return {filteredPointsTable: filteredPointsTable, points_table: points_table};
 }
 
-function displaySequenceTable(sequence_table) {
+//Create the color legend that serves for level 1 and level 2 
+
+function createColorLegend(data) {
+    var x1 = 3 * unit,
+            barWidth = document.getElementById("vis").offsetWidth - (7 * unit),
+            y1 = unit / 1.5,
+            barHeight = unit,
+            numberHues = data.length;
+    var idGradient = "legendGradient";
+    var svgForLegendStuff = d3.select("#legendGroup");
+    svgForLegendStuff.append("g").attr("id", "firstLegendGroup").append("defs")
+            .append("linearGradient")
+            .attr("id", idGradient)
+            .attr("x1", "0%")
+            .attr("x2", "100%")
+            .attr("y1", "0%")
+            .attr("y2", "0%");
+    svgForLegendStuff.append("rect")
+            .attr("fill", "url(#" + idGradient + ")")
+            .attr("x", x1)
+            .attr("y", y1)
+            .attr("width", barWidth)
+            .attr("height", barHeight);
+    var textY = y1 + barHeight / 2 + 5;
+    svgForLegendStuff.selectAll(".leftLegend")
+            .data(data)
+            .enter().append("g")
+            .attr("class", "leftLegend").append("text")
+            .attr("text-anchor", "middle")
+            .attr("x", x1 - 20)
+            .attr("y", textY).attr("font-size", "15px")
+            .attr("dy", 0)
+            .text(function (d, i) {
+                if (i === 0) {
+                    return d.value.toFixed(2);
+                }
+                return " ";
+            });
+    svgForLegendStuff.selectAll(".rightLegend")
+            .data(data)
+            .enter().append("g")
+            .attr("class", "rightLegend").append("text")
+            .attr("text-anchor", "left")
+            .attr("x", x1 + barWidth + 10)
+            .attr("y", textY)
+            .attr("font-size", "15px")
+            .attr("dy", 0)
+            .text(function (d, i) {
+                if (i === (data.length - 1)) {
+                    return d.value.toFixed(2);
+                }
+                return " ";
+            });
+    var hueStart = 160, hueEnd = 0;
+    var opacityStart = data[0].opacityValue, opacityEnd = data[data.length - 1].opacityValue;
+    var theHue, rgbString, opacity, p;
+    var deltaPercent = 1 / (numberHues - 1);
+    var deltaHue = (hueEnd - hueStart) / (numberHues - 1);
+    var deltaOpacity = (opacityEnd - opacityStart) / (numberHues - 1);
+    var theData = [];
+    for (var i = 0; i < numberHues; i++) {
+        theHue = hueStart + deltaHue * i;
+        rgbString = "#000099";
+        opacity = opacityStart + deltaOpacity * i;
+        p = 0 + deltaPercent * i;
+        theData.push({"rgb": rgbString, "opacity": opacity, "percent": p});
+    }
+    var stops = d3.select('#' + idGradient).selectAll('stop')
+            .data(theData);
+    stops.enter().append('stop');
+    stops.attr('offset', function (d) {
+        return d.percent;
+    })
+            .attr('stop-color', function (d) {
+                return d.rgb;
+            })
+            .attr('stop-opacity', function (d) {
+                return d.opacity;
+            });
+}
+
+function createSlider() {
+    var height = unit;
+    var width = document.getElementById("vis").offsetWidth - (7 * unit);
+    var x = d3.scale.linear().domain([0.1, 1.5]).range([0, width]).clamp(true);
+    var brush = d3.svg.brush().x(x).extent([0, 0]).on("brush", brushed);
+    var svg = d3.select("#scaleGroup");
+    svg.append("g").attr("class", "x axis").attr("transform", "translate(0," + height / 2 + ")").call(d3.svg.axis().scale(x).orient("bottom").tickSize(1).tickPadding(10).tickValues([0, 100]));
+    var slider = svg.append("g").attr("class", "slider").call(brush);
+    slider.selectAll(".extent,.resize").remove();
+    slider.select(".background").attr("height", height);
+    var handle = slider.append("circle").attr("class", "handle").attr("transform", "translate(0," + height / 2 + ")").attr("r", 5);
+    slider.call(brush.event).transition().duration(750).call(brush.extent([70, 70])).call(brush.event);
+    function brushed() {
+        if (fileWeight > 300) {
+            scaleValue = 0.3;
+        }
+        if (fileWeight < 300) {
+            scaleValue = 0.8;
+        }
+        var value = scaleValue;
+        if (d3.event.sourceEvent) {
+            value = x.invert(d3.mouse(this)[0]);
+            brush.extent([value, value]);
+        }
+        handle.attr("cx", x(value));
+        d3.select("#first").attr("transform", "scale(" + value + ")");
+    }
+}
+
+//Create first level visualization of the whole spectra data file
+
+function displaySequenceTable(sequence_table, width, height) {
     var rowCount = 0;
     var columnCount = 0;
     var seqOneCount = 0;
-    var seqTwoCount = 0;
     var rowHeaders = [];
     var columnHeaders = [];
     var yCount = 0;
@@ -323,8 +458,8 @@ function displaySequenceTable(sequence_table) {
     });
     var rect = d3.select("#first").append("rect")
             .attr("class", "background")
-            .attr("width", d3.select("svg").attr("width"))
-            .attr("height", d3.select("svg").attr("height")).attr("fill", "#A9A9A9");
+            .attr("width", width)
+            .attr("height", height).attr("fill", "#A9A9A9");
     var row = d3.select("#first").selectAll(".row")
             .data(rowHeaders)
             .enter().append("g")
@@ -338,7 +473,6 @@ function displaySequenceTable(sequence_table) {
                 return d;
             }).attr("transform", function (d, i) {
         computedLengthsArray[i] = this.getComputedTextLength();
-
         lengthValueText = lengthValueText + tempText[i];
         tempText[i + 1] = computedLengthsArray[i];
         var h = lengthValueText;
@@ -474,7 +608,7 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
     var z = d3.scale.linear().domain([minScore, maxScore]).range([0.1, 1]);
     existingData.forEach(function (d, i) {
         var fillOpacitiesTaffy;
-        var cell = d3.select("#first").append("rect")
+        d3.select("#first").append("rect")
                 .attr("x", d.positionX)
                 .attr("y", d.positionY)
                 .attr("width", d.w - 1)
@@ -489,9 +623,10 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
                     colorSelected.color = color;
                     var opacityObject = fillOpacitiesTaffy({value: d.value}).get();
                     colorSelected.opacity = opacityObject[0].opacityValue;
-                    d3.select("#first").style("visibility", "hidden");
+
+                    minimize("#first", 0, 0, scaleValue / 3);
                     createTreemap(points_table, d.sequence1, d.sequence2, blocks, precursorinfo, colorSelected);
-                    resetViewSVG();
+
                 })
                 .append("title")
                 .text("Sequence 1: " + d.sequence1 + "\nSequence 2: " + d.sequence2 + "\nScore: " + d.value);
@@ -516,88 +651,11 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
     return existingData;
 }
 
-function createColorLegend(data) {
-    var x1 = 50,
-            barWidth = 1200,
-            y1 = 10,
-            barHeight = 20,
-            numberHues = data.length;
-    var idGradient = "legendGradient";
-    var svgForLegendStuff = d3.select("#legendGroup");
-    svgForLegendStuff.append("g").attr("id", "firstLegendGroup").append("defs")
-            .append("linearGradient")
-            .attr("id", idGradient)
-            .attr("x1", "0%")
-            .attr("x2", "100%")
-            .attr("y1", "0%")
-            .attr("y2", "0%");
-    svgForLegendStuff.append("rect")
-            .attr("fill", "url(#" + idGradient + ")")
-            .attr("x", x1)
-            .attr("y", y1)
-            .attr("width", barWidth)
-            .attr("height", barHeight);
-    var textY = y1 + barHeight / 2 + 5;
-    svgForLegendStuff.selectAll(".leftLegend")
-            .data(data)
-            .enter().append("g")
-            .attr("class", "leftLegend").append("text")
-            .attr("text-anchor", "middle")
-            .attr("x", x1 - 20)
-            .attr("y", textY).attr("font-size", "15px")
-            .attr("dy", 0)
-            .text(function (d, i) {
-                if (i === 0) {
-                    return d.value.toFixed(2);
-                }
-                return " ";
-            });
-    svgForLegendStuff.selectAll(".rightLegend")
-            .data(data)
-            .enter().append("g")
-            .attr("class", "rightLegend").append("text")
-            .attr("text-anchor", "left")
-            .attr("x", x1 + barWidth + 10)
-            .attr("y", textY)
-            .attr("font-size", "15px")
-            .attr("dy", 0)
-            .text(function (d, i) {
-                if (i === (data.length - 1)) {
-                    return d.value.toFixed(2);
-                }
-                return " ";
-            });
-    var hueStart = 160, hueEnd = 0;
-    var opacityStart = data[0].opacityValue, opacityEnd = data[data.length - 1].opacityValue;
-    var theHue, rgbString, opacity, p;
-    var deltaPercent = 1 / (numberHues - 1);
-    var deltaHue = (hueEnd - hueStart) / (numberHues - 1);
-    var deltaOpacity = (opacityEnd - opacityStart) / (numberHues - 1);
-    var theData = [];
-    for (var i = 0; i < numberHues; i++) {
-        theHue = hueStart + deltaHue * i;
-        rgbString = "#000099";
-        opacity = opacityStart + deltaOpacity * i;
-        p = 0 + deltaPercent * i;
-        theData.push({"rgb": rgbString, "opacity": opacity, "percent": p});
-    }
-    var stops = d3.select('#' + idGradient).selectAll('stop')
-            .data(theData);
-    stops.enter().append('stop');
-    stops.attr('offset', function (d) {
-        return d.percent;
-    })
-            .attr('stop-color', function (d) {
-                return d.rgb;
-            })
-            .attr('stop-opacity', function (d) {
-                return d.opacity;
-            });
-}
+//Create the second level (Occurences of every combination of sequences)
 
 function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colorSelected) {
+    d3.select("#scaleGroup").remove();
     var results = points({sequence1: sequence1, sequence2: sequence2}).get();
-    var children = [];
     var root = {name: sequence1 + " " + sequence2, children: []};
     results.forEach(function (result) {
         root.children.push({name: "possibility", blockId: result.blockId, size: result.score, amass: result.amass, charge: result.charge, mz: result.mz, sequence1: result.sequence1, sequence2: result.sequence2, title: result.title, tmass: result.tmass});
@@ -610,8 +668,11 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
     }).value(function (d) {
         return x(d.size);
     });
-    var treeMapGroup = d3.select("#second");
-    var sequenceGroup = treeMapGroup.append("g").append("text").text(function (d) {
+
+    var transformYValue = 0;
+    var transformXValue = (document.getElementById("first").getBBox().width * 0.1) + (5 * unit);
+    var treeMapGroup = d3.select("#second").attr("transform", "translate(" + transformXValue + "," + transformYValue + ")");
+    treeMapGroup.append("g").append("text").text(function (d) {
         return sequence1 + " " + sequence2;
     }).attr("transform", function () {
         var textPositionX = (width / 2) - this.getComputedTextLength();
@@ -623,7 +684,7 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
             .attr("transform", function (d) {
                 return "translate(" + d.x + "," + d.y + ")";
             });
-    var cellRect = cell.append("rect")
+    cell.append("rect")
             .attr("width", function (d) {
                 return d.dx;
             })
@@ -638,14 +699,14 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
             })
             .style("stroke", "#FFF")
             .style("stroke-width", "2").on("click", function (d) {
-        d3.select("#second").style("visibility", "hidden");
+        minimize("#second", 0, document.getElementById("first").getBBox().height * 0.4 + 50, 0.3);
         createFinalLevel(blocks, d.blockId, precursorinfo);
-        resetViewSVG();
+
     }).append("title")
             .text(function (d) {
                 return  "Title: " + d.title + "\n M/Z: " + d.mz + "\n Charge: " + d.charge + "\n T-Mass: " + d.tmass + "\n E-Mass: " + d.amass;
             });
-    var text = cell.append("foreignObject")
+    cell.append("foreignObject")
             .attr("x", 5).attr("y", 5)
             .attr("dx", "1.8em")
             .attr("dy", "1.0em")
@@ -673,6 +734,8 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
             }).style("overflow", "hidden");
 }
 
+// Display Final Level (Precursor information level)
+
 function createFinalLevel(blocks, blockid, precursorinfo) {
     var blockdata = blocks({id: blockid}).get();
     var precursorinfodata = precursorinfo({blockId: blockid + ""}).get();
@@ -690,7 +753,10 @@ function createFinalLevel(blocks, blockid, precursorinfo) {
         character_table.push({id: counterRelay, uniqueNumber: j, sequence: splitseq2[j].toString().toUpperCase(), type: 2});
         counterRelay++;
     }
-    var svgElement = d3.select("#third").attr("transform", "translate(200,0)scale(3)");
+    var transformYValue = 0;
+    var transformXValue = document.getElementById("first").getBBox().width * 0.2 + document.getElementById("second").getBBox().width * 0.2 + (6 * unit);
+
+    d3.select("#third").attr("transform", "translate(" + transformXValue + "," + transformYValue + ")scale(3)");
     var resultArray = displayCharacterTable(character_table);
     var filteredPoints = [];
     precursorinfodata.forEach(function (info) {
@@ -698,15 +764,16 @@ function createFinalLevel(blocks, blockid, precursorinfo) {
         var targetNumber = info.frag2 - 1;
         filteredPoints.push({source: sourceNumber, target: targetNumber, value: parseFloat(info.score)});
     });
+    var charTableObj = TAFFY(character_table);
     var filteredPointsTaffyObject = TAFFY(filteredPoints);
-    var drawnPoints = createDataPointsOnMatrixForCharacterTable(resultArray.cellHeigts, resultArray.cellWidths, filteredPointsTaffyObject, character_table, blocks, precursorinfo, "brown");
+    createDataPointsOnMatrixForCharacterTable(resultArray.cellHeigts, resultArray.cellWidths, filteredPointsTaffyObject, charTableObj, blocks, precursorinfo, "brown");
+    d3.select("#scaleGroup").remove();
 }
 
 function displayCharacterTable(character_table) {
     var rowCount = 0;
     var columnCount = 0;
     var seqOneCount = 0;
-    var seqTwoCount = 0;
     var rowHeaders = [];
     var columnHeaders = [];
     var yCount = 0;
@@ -740,10 +807,13 @@ function displayCharacterTable(character_table) {
             yCount++;
         }
     });
+    var moveY = document.getElementById("first").getBBox().height + 100;
     var rect = d3.select("#third").append("rect")
             .attr("class", "backgroundThrd")
-            .attr("width", d3.select("svg").attr("width"))
-            .attr("height", d3.select("svg").attr("height")).attr("fill", "#A9A9A9");
+            .attr("width", document.getElementById("second").getBBox().width)
+            .attr("height", document.getElementById("second").getBBox().height).attr("fill", "#A9A9A9").on("click", function (d) {
+        minimize("#third", 0, moveY, 0.5);
+    });
     var row = d3.select("#third").selectAll(".row")
             .data(rowHeaders)
             .enter().append("g")
@@ -764,7 +834,6 @@ function displayCharacterTable(character_table) {
                 return d;
             }).attr("overflow", function (d, i) {
         computedLengthsArray[i] = this.getComputedTextLength();
-
     });
     var column = d3.select("#third").selectAll(".column")
             .data(columnHeaders)
@@ -786,7 +855,6 @@ function displayCharacterTable(character_table) {
                 return d;
             }).attr("overflow", function (d, i) {
         computedLengthsArrayColumn[i] = this.getComputedTextLength();
-
     });
     computedLengthsArray.sort();
     computedLengthsArrayColumn.sort();
@@ -851,12 +919,14 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
     rowColumnWidths[0] = 0;
     for (var i = 0; i < cellHeigts.length; i++) {
         matrix[i] = d3.range(cellWidths.length).map(function (j) {
-            return {w: 0, h: 0, positionX: 0, positionY: 0, source: j, target: i, score: 0};
+            return {w: 0, h: 0, positionX: 0, positionY: 0, char1: '', char2: '', source: j, target: i, score: 0};
         });
     }
     var points = pointsTaffyObject().get();
     points.forEach(function (point) {
         matrix[point.target][point.source].score = point.value;
+        matrix[point.target][point.source].char1 = points_table({uniqueNumber: point.source, type: 1}).get()[0].sequence;
+        matrix[point.target][point.source].char2 = points_table({uniqueNumber: point.target, type: 2}).get()[0].sequence;
     });
     cellHeigts.forEach(function (height, i) {
         var temp = rowCellHeigtsTemp[i] - height;
@@ -910,7 +980,7 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
     }
     var z = d3.scale.linear().domain([minScore, maxScore]).range([0.5, 2]).clamp(true);
     existingData.forEach(function (d, i) {
-        var cell = d3.select("#third").append("rect")
+        d3.select("#third").append("rect")
                 .attr("x", d.positionX)
                 .attr("y", d.positionY)
                 .attr("width", d.w - 1)
@@ -919,12 +989,13 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
             colorSelected.opacity = opacityValue;
             fillOpacities.push({opacityValue: opacityValue, value: d.score});
             return opacityValue;
-        });
+        }).append("title")
+                .text("Sequence 1: " + d.char1 + "\nSequence 2: " + d.char2 + "\nScore: " + d.score);
     });
     function compare(a, b) {
-        if (a.score < b.score)
+        if (a.value < b.value)
             return -1;
-        if (a.score > b.score)
+        if (a.value > b.value)
             return 1;
         return 0;
     }
@@ -934,18 +1005,15 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
 }
 
 function createColorLegendForPrecursrData(data, color) {
-    if (data.length === 0) {
-        data[0] = [{opacityValue: 0, value: 0}];
-        color = "#fff";
-    }
-    d3.select("#firstLegendGroup").remove();
-    var x1 = 50,
-            barWidth = 1200,
-            y1 = 10,
-            barHeight = 20,
-            numberHues = data.length;
+    d3.select("#legendGroup").remove();
+    d3.select("#scaleGroup").remove();
+    var x1 = unit * 2,
+            barWidth = document.getElementById("vis").offsetWidth - (7 * unit),
+            y1 = unit / 2,
+            barHeight = unit,
+            numberHues = data.length * 100;
     var idGradient = "legendGradient";
-    var svgForLegendStuff = d3.select("#legendGroup");
+    var svgForLegendStuff = d3.select("#infoGroup");
     svgForLegendStuff.append("g").append("defs")
             .append("linearGradient")
             .attr("id", idGradient)
