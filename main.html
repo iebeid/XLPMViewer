@@ -9,6 +9,9 @@
         <title>XLPM Map Viewer</title>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="js/jquery-1.7.min.js"></script>
+<script src="js/Three49custom.js"></script>
+<script type="text/javascript" src="js/GLmol.js"></script>
         <script src="js/d3.v3.min.js"></script>
         <script src="js/taffy.js"></script>
         <script src="js/xlpm.js"></script>
@@ -20,6 +23,16 @@
         <header>
             <div class="module">XLPM Map Viewer</div>
         </header>
+                <nav>
+            <div class="module">
+                <div id="mainmenu">
+                <a href="#">Home</a>
+                <a href="#">Main</a>
+                <a href="#">Contacts</a>
+                <a href="#">About</a>
+                </div>
+            </div>
+        </nav>
         <nav>
             <div class="module">
                 <div>
@@ -33,16 +46,33 @@
                 <div>
                 <button id="mainButton" type="button" onclick="main(fastaText, dataText)">Visualize</button>
                 <button type="button" onclick="clearSVG()">Clear</button>
+                <button type="button" onclick="enableView()">View Structures</button>
                 </div>
             </div>
         </nav>
+        <section>
+            <div id="structure" class="module">
+                <div id="container">
+                    <div id="glmol01">
+                        Please enter first PDB ID <input type="text" id="firstseq"/>
+                        <button type="button" onclick="view(document.getElementById('firstseq').value,'glmol01')">View</button>
+                        <textarea id="glmol01_src" style="display: none;"></textarea>
+                    </div>
+                    <div id="glmol02">
+                        Please enter second PDB ID <input type="text" id="secondseq"/>
+                        <button type="button" onclick="view(document.getElementById('secondseq').value,'glmol02')">View</button>
+                        <textarea id="glmol02_src" style="display: none;"></textarea>
+                    </div>
+                </div>
+            </div>
+        </section>
         <section>
             <div id="vis" class="module">
             </div>
         </section>
         <footer>
             <div class="module">
-                Copyright © 2015 Mihir Jaiswal & Islam Akef Ebeid 
+                Copyright © 2015 Mihir Jaiswal & Islam Akef Ebeid
             </div>
         </footer>
     </body>

@@ -9,7 +9,7 @@ scaleValue = 1;
 fileWeight = 0;
 
 function main(fastaFile, dataFile) {
-    d3.select("#vis").style("visibility", "visible");
+    $("#vis").show();
     var dim = calculateLWSVG(fastaFile);
     var sequence_table = createSequenceTable(fastaFile);
     var sequences = TAFFY(sequence_table);

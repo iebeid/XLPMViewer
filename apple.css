@@ -11,6 +11,7 @@ body {
     right:0;
     font-family: Helvetica;
     overflow:auto;
+    height: 100%;
 }
 header {
     width:100%;
@@ -38,4 +39,9 @@ footer {
     margin: 5px;
     width:auto;
 }
+
+#glmol01 {width: 50%; height: 100%; background-color: white; float: left;}
+#glmol02 {width: 50%; height: 100%; background-color: white; float: right;}
+#container {position: relative;
+    width: 100%; height: 600px;}
 

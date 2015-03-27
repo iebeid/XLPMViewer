@@ -12,5 +12,8 @@ No special configurations needed
  - d3.v3.min.js
  - taffy.js
  - snap.js
+ - GLmol.js
+ - JQuery
+ - Three.js
 
 There is no need to download these dependencies as they are already included and will be updated by the developers followed by an announcment.
