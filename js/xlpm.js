@@ -28,16 +28,21 @@ function init(svgDim) {
     var width = svgDim.w;
     var height = svgDim.h;
     var svg = d3.select("#vis").append("svg").attr("width", "100%").attr("height", "100%").attr("viewBox", "0 0 " + width + " " + height)
-            .attr("preserveAspectRatio", "xMinYMin meet").attr("id", "mainSVG");
+    .attr("preserveAspectRatio", "xMinYMin meet").attr("id", "mainSVG");
     svg.style("font-family", "Helvetica").style("font-size", "10px");
     var gridGroup = svg.append("g").attr("id", "gridGroup");
     var infoGroup = svg.append("g").attr("id", "infoGroup").attr("transform", "translate(" + unit + "," + unit + ")");
     infoGroup.append("g").attr("id", "legendGroup");
     infoGroup.append("g").attr("id", "scaleGroup").attr("transform", "translate(" + 3 * unit + "," + (unit + unit / 2) + ")");
     var visGroup = svg.append("g").attr("id", "visGroup").attr("transform", "translate(" + unit + "," + 5 * unit + ")");
-    visGroup.append("g").attr("id", "first");
-    visGroup.append("g").attr("id", "second");
-    visGroup.append("g").attr("id", "third");
+    var firstGroup = visGroup.append("g").attr("id", "first");
+    var secondGroup = visGroup.append("g").attr("id", "second");
+    var thirdGroup = visGroup.append("g").attr("id", "third");
+    //var drag = d3.behavior.drag().on("drag",function(d){
+    //    d3.select(this).attr("transform", "translate(" + d3.event.x + "," + d3.event.y + ")");
+    //})
+    //.on("dragstart", function() {d3.event.sourceEvent.stopPropagation();});
+    //firstGroup.call(drag);
     drawSVG(gridGroup, width, height);
     return {width: width, height: height};
 }
@@ -69,6 +74,7 @@ function calculateLWSVG(fastaFile) {
     var calculatedWidth = document.getElementById("vis").clientWidth - 28;
     unit = (calculatedWidth / calculatedHeight) * 1.68 + 20;
     fileWeight = firstSeq.length * secondSeq.length;
+    //console.log("fileWeight: " + fileWeight);
     return {w: calculatedWidth, h: calculatedHeight};
 }
 
@@ -228,13 +234,14 @@ function createBlockTable(dataFile) {
                 var splitseq = line.split("\t");
                 var frag1Filtered = checkForSpecialCharacters(splitseq[2].toString().toUpperCase());
                 var frag2Filtered = checkForSpecialCharacters(splitseq[3].toString().toUpperCase());
-                blocks.push({id: reactionCounter, title: splitseq[0], mz: splitseq[1], fragment1: frag1Filtered.toString(), fragment2: frag2Filtered.toString(), tmass: splitseq[4], amass: splitseq[5], charge: splitseq[6], score: splitseq[7]});
                 reactionCounter++;
+                blocks.push({id: reactionCounter, title: splitseq[0], mz: splitseq[1], fragment1: frag1Filtered.toString(), fragment2: frag2Filtered.toString(), tmass: splitseq[4], amass: splitseq[5], charge: splitseq[6], score: splitseq[7]});
+                
             }
             else {
                 var info = reactionCounter + line;
                 var splitinfo = info.split("\t");
-
+                console.log({blockId: splitinfo[0], frag1: splitinfo[2], frag2: splitinfo[3], score: splitinfo[4]});
                 precursorinfo.push({blockId: splitinfo[0], frag1: splitinfo[2], frag2: splitinfo[3], score: splitinfo[4]});
             }
         }
@@ -273,6 +280,7 @@ function createPointsTable(sequences, blocks) {
     }
     var result = blocks().get();
     result.forEach(function (r) {
+       // console.log(r);
         var seqs1 = r.fragment1;
         var splitseq1 = seqs1.match(/([^KR])*[KR]?/g);
         splitseq1.pop();
@@ -399,15 +407,20 @@ function createSlider() {
     slider.selectAll(".extent,.resize").remove();
     slider.select(".background").attr("height", height);
     var handle = slider.append("circle").attr("class", "handle").attr("transform", "translate(0," + height / 2 + ")").attr("r", 5);
-    slider.call(brush.event).transition().duration(750).call(brush.extent([70, 70])).call(brush.event);
+    slider.call(brush.event).transition().duration(750).call(brush.extent([100, 100])).call(brush.event);
     function brushed() {
-        if (fileWeight > 300) {
-            scaleValue = 0.3;
+        
+        if (fileWeight >= 20000) {
+            scaleValue = 0.5;
+            if (fileWeight >= 300000) {
+                scaleValue=0.15;
+            }
         }
-        if (fileWeight < 300) {
-            scaleValue = 0.8;
+        if (fileWeight < 20000) {
+            scaleValue = 1;
         }
         var value = scaleValue;
+       // console.log("fileWeight: " + fileWeight);
         if (d3.event.sourceEvent) {
             value = x.invert(d3.mouse(this)[0]);
             brush.extent([value, value]);
@@ -620,13 +633,14 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
             return opacityValue;
         })
                 .on("click", function () {
+                    if (d3.event.defaultPrevented) return;
                     colorSelected.color = color;
                     var opacityObject = fillOpacitiesTaffy({value: d.value}).get();
                     colorSelected.opacity = opacityObject[0].opacityValue;
 
                     minimize("#first", 0, 0, scaleValue / 3);
                     createTreemap(points_table, d.sequence1, d.sequence2, blocks, precursorinfo, colorSelected);
-
+                    //console.log("treemap created");
                 })
                 .append("title")
                 .text("Sequence 1: " + d.sequence1 + "\nSequence 2: " + d.sequence2 + "\nScore: " + d.value);
@@ -655,6 +669,7 @@ function createDataPointsOnMatrix(cellHeigts, cellWidths, pointsTaffyObject, poi
 
 function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colorSelected) {
     d3.select("#scaleGroup").remove();
+    //console.log("creating treemap");
     var results = points({sequence1: sequence1, sequence2: sequence2}).get();
     var root = {name: sequence1 + " " + sequence2, children: []};
     results.forEach(function (result) {
@@ -684,6 +699,7 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
             .attr("transform", function (d) {
                 return "translate(" + d.x + "," + d.y + ")";
             });
+    //console.log("creating rectangle");
     cell.append("rect")
             .attr("width", function (d) {
                 return d.dx;
@@ -698,14 +714,10 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
                 return colorSelected.opacity;
             })
             .style("stroke", "#FFF")
-            .style("stroke-width", "2").on("click", function (d) {
-        minimize("#second", 0, document.getElementById("first").getBBox().height * 0.4 + 50, 0.3);
-        createFinalLevel(blocks, d.blockId, precursorinfo);
-
-    }).append("title")
-            .text(function (d) {
-                return  "Title: " + d.title + "\n M/Z: " + d.mz + "\n Charge: " + d.charge + "\n T-Mass: " + d.tmass + "\n E-Mass: " + d.amass;
-            });
+            .style("stroke-width", "2");
+    
+    
+    
     cell.append("foreignObject")
             .attr("x", 5).attr("y", 5)
             .attr("dx", "1.8em")
@@ -722,8 +734,7 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
         return d.dx;
     }).attr("height", function (d) {
         return d.dy;
-    })
-            .append("xhtml:body")
+    }).append("xhtml:body")
             .html(function (d) {
                 var blockData = blocks({id: d.blockId}).get();
                 var textString = "";
@@ -732,13 +743,29 @@ function createTreemap(points, sequence1, sequence2, blocks, precursorinfo, colo
                     return textString;
                 }
             }).style("overflow", "hidden");
+            
+            cell.append("title")
+            .text(function (d) {
+                return  "Title: " + d.title + "\n M/Z: " + d.mz + "\n Charge: " + d.charge + "\n T-Mass: " + d.tmass + "\n E-Mass: " + d.amass;
+            });
+            
+            cell.on("click", function (d) {
+                if (d3.event.defaultPrevented) return;
+        //console.log("Treemap clicked!");
+        minimize("#second", 0, document.getElementById("first").getBBox().height , 0.3);
+        
+        createFinalLevel(blocks, d.blockId, precursorinfo);
+
+    });
 }
 
 // Display Final Level (Precursor information level)
 
 function createFinalLevel(blocks, blockid, precursorinfo) {
     var blockdata = blocks({id: blockid}).get();
+    
     var precursorinfodata = precursorinfo({blockId: blockid + ""}).get();
+    console.log(precursorinfodata);
     var counterRelay = 0;
     var character_table = [];
     var frag1 = blockdata[0].fragment1;
@@ -760,8 +787,10 @@ function createFinalLevel(blocks, blockid, precursorinfo) {
     var resultArray = displayCharacterTable(character_table);
     var filteredPoints = [];
     precursorinfodata.forEach(function (info) {
-        var sourceNumber = info.frag1 - 1;
-        var targetNumber = info.frag2 - 1;
+        //console.log(info);
+        var sourceNumber = info.frag1-1;
+        var targetNumber = info.frag2-1;
+        //console.log({source: sourceNumber, target: targetNumber, value: parseFloat(info.score)});
         filteredPoints.push({source: sourceNumber, target: targetNumber, value: parseFloat(info.score)});
     });
     var charTableObj = TAFFY(character_table);
@@ -807,11 +836,12 @@ function displayCharacterTable(character_table) {
             yCount++;
         }
     });
-    var moveY = document.getElementById("first").getBBox().height + 100;
+    var moveY = document.getElementById("first").getBBox().height;
     var rect = d3.select("#third").append("rect")
             .attr("class", "backgroundThrd")
             .attr("width", document.getElementById("second").getBBox().width)
             .attr("height", document.getElementById("second").getBBox().height).attr("fill", "#A9A9A9").on("click", function (d) {
+                if (d3.event.defaultPrevented) return;
         minimize("#third", 0, moveY, 0.5);
     });
     var row = d3.select("#third").selectAll(".row")
@@ -923,11 +953,20 @@ function createDataPointsOnMatrixForCharacterTable(cellHeigts, cellWidths, point
         });
     }
     var points = pointsTaffyObject().get();
+   // console.log("cellHeigts.length: " + cellHeigts.length + "cellWidths.length: " + cellWidths.length);
+    if(points.length!=0){
     points.forEach(function (point) {
+        console.log(point);
         matrix[point.target][point.source].score = point.value;
         matrix[point.target][point.source].char1 = points_table({uniqueNumber: point.source, type: 1}).get()[0].sequence;
         matrix[point.target][point.source].char2 = points_table({uniqueNumber: point.target, type: 2}).get()[0].sequence;
     });
+    }else{
+     //   console.log("no points found");
+        matrix[0][0].score = 0;
+        matrix[0][0].char1 = '';
+        matrix[0][0].char2 = '';
+    }
     cellHeigts.forEach(function (height, i) {
         var temp = rowCellHeigtsTemp[i] - height;
         i += 1;

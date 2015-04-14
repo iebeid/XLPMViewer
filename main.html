@@ -11,12 +11,12 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script src="js/jquery-1.7.min.js"></script>
 <script src="js/Three49custom.js"></script>
-<script type="text/javascript" src="js/GLmol.js"></script>
+<script src="js/GLmol.js"></script>
         <script src="js/d3.v3.min.js"></script>
         <script src="js/taffy.js"></script>
         <script src="js/xlpm.js"></script>
         <script src="js/inputs.js"></script>
-        <script src="js/snap.svg-min.js"></script>
+        <script src="js/snap.svg.js"></script>
         <style>@import url(apple.css);</style>
     </head>
     <body>
@@ -28,6 +28,7 @@
                 <div id="mainmenu">
                 <a href="#">Home</a>
                 <a href="#">Main</a>
+                <a href="#">Downloads</a>
                 <a href="#">Contacts</a>
                 <a href="#">About</a>
                 </div>
@@ -55,6 +56,7 @@
                 <div id="container">
                     <div id="glmol01">
                         Please enter first PDB ID <input type="text" id="firstseq"/>
+                        Or Upload a PDB File <input type="file" id="viewMol1"/>
                         <button type="button" onclick="view(document.getElementById('firstseq').value,'glmol01')">View</button>
                         <textarea id="glmol01_src" style="display: none;"></textarea>
                     </div>
