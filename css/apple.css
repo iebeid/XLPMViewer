@@ -39,9 +39,21 @@ footer {
     margin: 5px;
     width:auto;
 }
-
-#glmol01 {width: 50%; height: 100%; background-color: white; float: left;}
-#glmol02 {width: 50%; height: 100%; background-color: white; float: right;}
-#container {position: relative;
-    width: 100%; height: 600px;}
+#glmol01 {
+    width: 50%; 
+    height: 95%;
+    background-color: white; 
+    float: left;
+}
+#glmol02 {
+    width: 50%;
+    height: 95%;
+    background-color: white;
+    float: right;
+}
+#container {
+    position: relative;
+    width: 100%;
+    height: 600px;
+}
 
